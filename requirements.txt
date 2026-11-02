@@ -1,0 +1,8 @@
+torch>=2.3
+torchvision>=0.18
+torchsummary
+numpy
+pandas
+pillow
+matplotlib
+kaggle

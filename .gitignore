@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+.ipynb_checkpoints/
+.DS_Store
+data/
+data.zip
+# keep run configs/histories/logs for the report; weights and pid files stay local
+runs/**/*.pt
+runs/**/pid
+submission.csv
+*.pt
+project1.pdf
+# share the Cursor/VS Code tasks (overrides a global .vscode/ ignore)
+!.vscode/
+.vscode/*
+!.vscode/tasks.json
