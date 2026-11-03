@@ -1,0 +1,44 @@
+Model resnet_a: 4,977,226 trainable parameters | device cuda | AMP True
+Train images: 45,000 | val images: 5,000
+epoch   1/40 | lr 0.0002 | train loss 2.1495 acc 21.79 | val loss 1.8572 acc 30.86 | 23.5s
+epoch   2/40 | lr 0.0335 | train loss 2.0447 acc 27.55 | val loss 1.7432 acc 35.18 | 17.2s
+epoch   3/40 | lr 0.0669 | train loss 1.9583 acc 31.50 | val loss 1.5785 acc 43.26 | 17.0s
+epoch   4/40 | lr 0.1000 | train loss 1.8321 acc 38.17 | val loss 1.3275 acc 52.00 | 17.7s
+epoch   5/40 | lr 0.0998 | train loss 1.7217 acc 43.81 | val loss 1.1868 acc 58.58 | 16.8s
+epoch   6/40 | lr 0.0993 | train loss 1.6438 acc 47.98 | val loss 1.1858 acc 57.50 | 17.5s
+epoch   7/40 | lr 0.0984 | train loss 1.5746 acc 51.88 | val loss 1.0145 acc 65.16 | 17.0s
+epoch   8/40 | lr 0.0971 | train loss 1.5189 acc 54.53 | val loss 0.9589 acc 66.80 | 17.0s
+epoch   9/40 | lr 0.0956 | train loss 1.4750 acc 56.72 | val loss 0.9497 acc 66.50 | 16.9s
+epoch  10/40 | lr 0.0937 | train loss 1.4280 acc 58.88 | val loss 0.8618 acc 70.68 | 17.4s
+epoch  11/40 | lr 0.0914 | train loss 1.3922 acc 60.13 | val loss 0.9167 acc 69.34 | 17.1s
+epoch  12/40 | lr 0.0889 | train loss 1.3607 acc 61.94 | val loss 0.7695 acc 73.32 | 17.5s
+epoch  13/40 | lr 0.0861 | train loss 1.3294 acc 63.54 | val loss 0.8203 acc 72.38 | 17.1s
+epoch  14/40 | lr 0.0830 | train loss 1.2959 acc 65.16 | val loss 0.7660 acc 73.68 | 17.1s
+epoch  15/40 | lr 0.0797 | train loss 1.2757 acc 66.02 | val loss 0.6824 acc 78.32 | 17.3s
+epoch  16/40 | lr 0.0762 | train loss 1.2463 acc 67.51 | val loss 0.6694 acc 78.26 | 17.3s
+epoch  17/40 | lr 0.0725 | train loss 1.2218 acc 68.60 | val loss 0.6311 acc 80.24 | 17.0s
+epoch  18/40 | lr 0.0686 | train loss 1.2037 acc 69.25 | val loss 0.6750 acc 78.02 | 17.0s
+epoch  19/40 | lr 0.0646 | train loss 1.1806 acc 70.51 | val loss 0.5565 acc 82.74 | 17.2s
+epoch  20/40 | lr 0.0605 | train loss 1.1601 acc 71.36 | val loss 0.5279 acc 84.20 | 17.2s
+epoch  21/40 | lr 0.0564 | train loss 1.1411 acc 72.38 | val loss 0.5642 acc 82.40 | 17.1s
+epoch  22/40 | lr 0.0521 | train loss 1.1206 acc 73.04 | val loss 0.5478 acc 83.18 | 17.0s
+epoch  23/40 | lr 0.0479 | train loss 1.1086 acc 73.63 | val loss 0.5356 acc 83.48 | 17.1s
+epoch  24/40 | lr 0.0436 | train loss 1.0944 acc 74.21 | val loss 0.5572 acc 82.28 | 17.4s
+epoch  25/40 | lr 0.0395 | train loss 1.0778 acc 75.38 | val loss 0.5235 acc 84.30 | 17.1s
+epoch  26/40 | lr 0.0354 | train loss 1.0610 acc 76.03 | val loss 0.4674 acc 86.44 | 17.5s
+epoch  27/40 | lr 0.0314 | train loss 1.0470 acc 76.60 | val loss 0.4650 acc 86.24 | 17.2s
+epoch  28/40 | lr 0.0275 | train loss 1.0372 acc 76.94 | val loss 0.4297 acc 87.54 | 17.2s
+epoch  29/40 | lr 0.0238 | train loss 1.0202 acc 77.87 | val loss 0.4245 acc 87.28 | 17.4s
+epoch  30/40 | lr 0.0203 | train loss 1.0078 acc 78.38 | val loss 0.4183 acc 87.40 | 17.3s
+epoch  31/40 | lr 0.0170 | train loss 0.9946 acc 79.11 | val loss 0.3949 acc 89.18 | 17.5s
+epoch  32/40 | lr 0.0139 | train loss 0.9754 acc 79.88 | val loss 0.3957 acc 89.38 | 17.1s
+epoch  33/40 | lr 0.0111 | train loss 0.9674 acc 80.60 | val loss 0.3807 acc 89.58 | 17.4s
+epoch  34/40 | lr 0.0086 | train loss 0.9550 acc 80.84 | val loss 0.3598 acc 90.12 | 17.3s
+epoch  35/40 | lr 0.0063 | train loss 0.9447 acc 81.59 | val loss 0.3603 acc 90.20 | 17.1s
+epoch  36/40 | lr 0.0044 | train loss 0.9349 acc 81.95 | val loss 0.3520 acc 90.84 | 17.1s
+epoch  37/40 | lr 0.0029 | train loss 0.9289 acc 82.10 | val loss 0.3446 acc 90.86 | 17.4s
+epoch  38/40 | lr 0.0016 | train loss 0.9212 acc 82.59 | val loss 0.3445 acc 90.62 | 17.4s
+epoch  39/40 | lr 0.0007 | train loss 0.9201 acc 82.63 | val loss 0.3403 acc 90.92 | 17.2s
+epoch  40/40 | lr 0.0002 | train loss 0.9208 acc 82.44 | val loss 0.3403 acc 91.04 | 15.6s
+Trainable parameters: 4,977,226
+Final val accuracy: 91.04% (flip TTA: 91.10%) | best: 91.04%

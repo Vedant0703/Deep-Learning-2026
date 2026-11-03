@@ -1,0 +1,36 @@
+{
+  // Cursor / VS Code tasks: Command Palette > "Tasks: Run Task". See scripts/colab.py for details.
+  "version": "2.0.0",
+  "tasks": [
+    { "label": "Colab: up (start GPU session, upload code + data)", "type": "shell",
+      "command": "python3 scripts/colab.py up", "problemMatcher": [] },
+    { "label": "Colab: upload data (running session)", "type": "shell",
+      "command": "python3 scripts/colab.py data", "problemMatcher": [] },
+    { "label": "Colab: sync code", "type": "shell",
+      "command": "python3 scripts/colab.py sync", "problemMatcher": [] },
+    { "label": "Colab: screen all models", "type": "shell",
+      "command": "python3 scripts/colab.py screen ${input:epochs}", "problemMatcher": [] },
+    { "label": "Colab: train", "type": "shell",
+      "command": "python3 scripts/colab.py train ${input:run} --model ${input:model} --epochs ${input:epochs} ${input:extraArgs}",
+      "problemMatcher": [] },
+    { "label": "Colab: follow logs", "type": "shell",
+      "command": "python3 scripts/colab.py follow ${input:runs}", "problemMatcher": [] },
+    { "label": "Colab: status", "type": "shell",
+      "command": "python3 scripts/colab.py status ${input:runs}", "problemMatcher": [] },
+    { "label": "Colab: fetch results", "type": "shell",
+      "command": "python3 scripts/colab.py fetch ${input:runs}", "problemMatcher": [] },
+    { "label": "Colab: down (stop session)", "type": "shell",
+      "command": "python3 scripts/colab.py down", "problemMatcher": [] },
+    { "label": "Kaggle: predict + submit", "type": "shell",
+      "command": "scripts/submit.sh ${input:run} '${input:message}'", "problemMatcher": [] }
+  ],
+  "inputs": [
+    { "id": "run", "type": "promptString", "description": "Run name (folder under runs/)", "default": "final_a" },
+    { "id": "runs", "type": "promptString", "description": "Run name(s), space separated",
+      "default": "screen_resnet_a screen_resnet_b screen_resnet_c" },
+    { "id": "model", "type": "pickString", "description": "Model", "options": ["resnet_a", "resnet_b", "resnet_c"] },
+    { "id": "epochs", "type": "promptString", "description": "Epochs", "default": "40" },
+    { "id": "extraArgs", "type": "promptString", "description": "Extra src.train args (optional)", "default": "" },
+    { "id": "message", "type": "promptString", "description": "Kaggle submission message" }
+  ]
+}

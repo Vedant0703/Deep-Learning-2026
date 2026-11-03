@@ -1,0 +1,39 @@
+{
+  "model": "resnet_c",
+  "dropout": 0.0,
+  "epochs": 300,
+  "batch_size": 256,
+  "lr": 0.1,
+  "momentum": 0.9,
+  "wd": 0.0005,
+  "warmup_epochs": 3,
+  "label_smoothing": 0.1,
+  "aug": "trivial",
+  "erasing": 0.25,
+  "jitter": 0.0,
+  "noise": 0.0,
+  "mix_alpha": 0.0,
+  "mix_prob": 0.5,
+  "ema": 0.999,
+  "teacher": [
+    "runs/teacher_wrn300/final.pt"
+  ],
+  "kd_alpha": 0.9,
+  "kd_temp": 4.0,
+  "student_noise": 0.04,
+  "val_size": 5000,
+  "data_dir": "data",
+  "out": "runs/twin_strong",
+  "ckpt_every": 10,
+  "resume": true,
+  "wait_for": [
+    "runs/teacher_wrn300/final.pt"
+  ],
+  "seed": 0,
+  "split_seed": 0,
+  "num_workers": 3,
+  "subset": null,
+  "compile": false,
+  "no_amp": false,
+  "n_params": 4623178
+}
