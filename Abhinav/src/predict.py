@@ -21,6 +21,17 @@ def predict_probs(model, loader, device, tta="flip"):
     return torch.cat([tta_probs(model, x.to(device), tta).cpu() for x in loader]).numpy()
 
 
+def balance_probs(probs, iters=100):
+    """Sinkhorn-rescale the class columns so every class gets the same total probability mass (a class-prior
+    adjustment that assumes a class-balanced test set). Uses only the unlabeled predictions; no labels, no training."""
+    q = probs.astype(np.float64)
+    target = q.shape[0] / q.shape[1]
+    for _ in range(iters):
+        q = q * (target / q.sum(0, keepdims=True))
+        q = q / q.sum(1, keepdims=True)
+    return q
+
+
 def write_submission(ids, preds, out_path, sample_path):
     sub = pd.DataFrame({"id": ids, "label": preds.astype(int)})
     sample = pd.read_csv(sample_path)
@@ -38,6 +49,8 @@ def main(argv=None):
     p.add_argument("--out", default="submission.csv")
     p.add_argument("--tta", default="flip", choices=["none", "flip", "flip_shift"],
                    help="test-time views averaged per image (see src.train.tta_probs)")
+    p.add_argument("--balance", action="store_true",
+                   help="class-balanced decoding (balance_probs); only with the professor's approval")
     args = p.parse_args(argv)
 
     device = get_device()
@@ -46,7 +59,12 @@ def main(argv=None):
     assert count_params(model) <= PARAM_BUDGET, f"{count_params(model):,} params is over the {PARAM_BUDGET:,} budget"
     loader, ids = build_test_loader(args.data_dir)
     probs = predict_probs(model, loader, device, tta=args.tta)
-    sub = write_submission(ids, probs.argmax(1), args.out, Path(args.data_dir) / "sample_submission.csv")
+    preds = probs.argmax(1)
+    if args.balance:
+        balanced = balance_probs(probs).argmax(1)
+        print(f"Class-balanced decoding changed {(balanced != preds).sum()} of {len(preds)} predictions")
+        preds = balanced
+    sub = write_submission(ids, preds, args.out, Path(args.data_dir) / "sample_submission.csv")
 
     print(f"Model params: {count_params(model):,} | wrote {len(sub)} predictions to {args.out}")
     counts = np.bincount(sub.label, minlength=10)

@@ -1,0 +1,28 @@
+# NAME|SBATCH_OPTS|TRAIN_ARGS|FILES_NEEDED_FIRST
+h_final1600|--time=12:00:00|--model resnet_c --epochs 1600 @C --teacher runs/teacher50/final.pt --val-size 0|
+h_fm1600|--time=12:00:00|--model resnet_c --epochs 1600 @C --teacher runs/teacher_wrn300/final.pt|
+#h_fm800_ens2|--time=10:00:00|--model resnet_c --epochs 800 @C --teacher runs/teacher_wrn300/final.pt runs/h_teacher_sam45/final.pt|
+#h_final800_ens2|--time=10:00:00|--model resnet_c --epochs 800 @C --val-size 0 --teacher runs/teacher50/final.pt runs/h_teacher_sam50/final.pt|
+h_teacher_sam45_s1||@T --seed 1|
+#h_teacher_sam45_s2||@T --seed 2|
+#h_teacher_sam50_s1||@T --seed 1 --val-size 0|
+h_teacher_sam50_s2||@T --seed 2 --val-size 0|
+#h_fm800_ens4|--time=16:00:00|--model resnet_c --epochs 800 @C --teacher runs/teacher_wrn300/final.pt runs/h_teacher_sam45/final.pt runs/h_teacher_sam45_s1/final.pt runs/h_teacher_sam45_s2/final.pt|runs/h_teacher_sam45_s1/final.pt runs/h_teacher_sam45_s2/final.pt
+#h_final800_ens4|--time=16:00:00|--model resnet_c --epochs 800 @C --val-size 0 --teacher runs/teacher50/final.pt runs/h_teacher_sam50/final.pt runs/h_teacher_sam50_s1/final.pt runs/h_teacher_sam50_s2/final.pt|runs/h_teacher_sam50_s1/final.pt runs/h_teacher_sam50_s2/final.pt
+h_fm800_a1||--model resnet_c --epochs 800 @C --kd-alpha 1.0 --teacher runs/teacher_wrn300/final.pt|
+h_fm800_nn||--model resnet_c --epochs 800 --ema 0.999 --student-noise 0 --mix-alpha 1.0 --mix-prob 0.5 --teacher runs/teacher_wrn300/final.pt|
+h_fm800_sam||--model resnet_c --epochs 800 @C --teacher runs/h_teacher_sam45/final.pt|
+h_final800_sam||--model resnet_c --epochs 800 @C --val-size 0 --teacher runs/h_teacher_sam50/final.pt|
+h_teacher_aa45||@T --seed 3 --aug autoaugment|
+h_teacher_aa50||@T --seed 3 --aug autoaugment --val-size 0|
+h_teacher_w40_45|--time=12:00:00|--model wrn40_10 --epochs 300 --ema 0.999 --label-smoothing 0 --sam-rho 0.05 --seed 4|
+h_teacher_w40_50|--time=12:00:00|--model wrn40_10 --epochs 300 --ema 0.999 --label-smoothing 0 --sam-rho 0.05 --seed 4 --val-size 0|
+h_fm800_ens3|--time=12:00:00|--model resnet_c --epochs 800 @C --teacher runs/teacher_wrn300/final.pt runs/h_teacher_sam45/final.pt runs/h_teacher_sam45_s1/final.pt|runs/h_teacher_sam45_s1/final.pt
+h_final800_ens3|--time=12:00:00|--model resnet_c --epochs 800 @C --val-size 0 --teacher runs/teacher50/final.pt runs/h_teacher_sam50/final.pt runs/h_teacher_sam50_s2/final.pt|runs/h_teacher_sam50_s2/final.pt
+# Round 7 (Nov 4 06:20 EST): 4-teacher diverse students (teacher set 98.38 on val), then a second diverse teacher round
+h_fm800_div|--time=12:00:00|--model resnet_c --epochs 800 @C --teacher runs/h_teacher_sam45/final.pt runs/h_teacher_sam45_s1/final.pt runs/h_teacher_aa45/final.pt runs/h_teacher_w40_45/final.pt|runs/h_teacher_aa45/final.pt runs/h_teacher_w40_45/final.pt
+h_final800_div|--time=12:00:00|--model resnet_c --epochs 800 @C --val-size 0 --teacher runs/h_teacher_sam50/final.pt runs/h_teacher_sam50_s2/final.pt runs/h_teacher_aa50/final.pt runs/h_teacher_w40_50/final.pt|runs/h_teacher_aa50/final.pt runs/h_teacher_w40_50/final.pt
+h_teacher_aa45_s2||@T --seed 5 --aug autoaugment|runs/h_teacher_w40_50/final.pt
+h_teacher_aa50_s2||@T --seed 5 --aug autoaugment --val-size 0|runs/h_teacher_w40_50/final.pt
+h_teacher_w40aa45|--time=12:00:00|--model wrn40_10 --epochs 300 --ema 0.999 --label-smoothing 0 --sam-rho 0.05 --seed 6 --aug autoaugment|runs/h_teacher_w40_50/final.pt
+h_teacher_w40aa50|--time=12:00:00|--model wrn40_10 --epochs 300 --ema 0.999 --label-smoothing 0 --sam-rho 0.05 --seed 6 --aug autoaugment --val-size 0|runs/h_teacher_w40_50/final.pt

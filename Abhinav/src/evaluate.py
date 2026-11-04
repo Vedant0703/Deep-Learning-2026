@@ -23,6 +23,7 @@ import numpy as np
 import torch
 
 from .data import build_val_loader
+from .predict import balance_probs
 from .train import TeacherEnsemble, evaluate, get_device, load_model, tta_probs
 
 SUITE = {
@@ -86,6 +87,8 @@ def main(argv=None):
     p.add_argument("--split", default="val", choices=["val", "train"],
                    help="clean images to use: the 5k val split, or the 45k training side of it (no augmentation)")
     p.add_argument("--no-suite", action="store_true", help="skip the corruption suite")
+    p.add_argument("--balance", action="store_true",
+                   help="also report class-balanced decoding (src.predict --balance); the val split is class-balanced")
     p.add_argument("--num-workers", type=int, default=2)
     args = p.parse_args(argv)
 
@@ -110,10 +113,20 @@ def main(argv=None):
         for tta in args.tta:
             probs, labels = predict(model, clean, device, use_amp, tta)
             right = probs.argmax(1) == labels
-            acc = [evaluate(model, loader, device, use_amp, tta)[1] for loader in suite.values()]
+            if args.balance:  # keep the suite's probabilities so they can be decoded both ways
+                suite_out = [predict(model, loader, device, use_amp, tta) for loader in suite.values()]
+                acc = [100 * (q.argmax(1) == y).float().mean().item() for q, y in suite_out]
+            else:
+                acc = [evaluate(model, loader, device, use_amp, tta)[1] for loader in suite.values()]
             line = f"{name[-34:]:<34} {tta:<10} {100 * right.float().mean():6.2f} "
             line += (f"{np.mean(acc):6.2f} {min(acc):6.2f} | " + " ".join(f"{a:8.2f}" for a in acc)) if acc else ""
             print(line, flush=True)
+            if args.balance:
+                bal = lambda q, y: 100 * (balance_probs(q.numpy()).argmax(1) == y.numpy()).mean()  # noqa: E731
+                bacc = [bal(q, y) for q, y in suite_out]
+                line = f"{'  + balanced':<34} {tta:<10} {bal(probs, labels):6.2f} "
+                line += (f"{np.mean(bacc):6.2f} {min(bacc):6.2f} | " + " ".join(f"{a:8.2f}" for a in bacc)) if bacc else ""
+                print(line, flush=True)
             if "baseline" in others:
                 base_name, base = others["baseline"]
                 base_right = base[tta].argmax(1) == labels

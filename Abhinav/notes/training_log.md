@@ -899,3 +899,713 @@ What it tells us:
   2. **A longer student schedule,** if `twin_kdn500` shows a real gain.
   3. **Drop the student noise** if it costs clean accuracy in the final comparison. It is neutral at matched
      fractions with 300 epochs, but it bought nothing visible on the leaderboard.
+
+## Final push, Phase 1: architecture screens (launched 2026-11-03 16:48 EST, Colab)
+Plan: `~/.claude/plans/the-high-level-goal-rosy-star.md`. The goal is to raise clean val of a single ≤5M student
+toward 98.3-98.6.
+
+**Measured first, ruling out test-time BN adaptation:**
+- BN-input statistics on the hidden images vs clean val:
+  - early layers: mean-shift 0.034 (floor 0.011), about as much as ±20% brightness, which costs about 0.2;
+  - **last layers: 0.070 mean-shift / 0.138 log-var**, larger than any photometric corruption (0.01-0.04);
+  - so the shift is **semantic**.
+- TTBN on the held-out twin (`r1_fm`): clean -0.50, brightness -0.5 to -0.6, noise -0.65; blur +0.25, JPEG +1.75.
+  It changes 80 of 2,000 hidden predictions. **Not used.**
+
+**Phase 1 arms** (300 ep, 45k, FM α 1 / p 0.5, student noise 0.04, KD from `teacher_wrn300`; baseline `r1_fm`, 97.66 /
+97.78 flip):
+
+| Arm | Model | Params | GMACs | Tests |
+|---|---|---|---|---|
+| `p1_hr` | `resnet_c_hr`, strides (1,2,1), stages at 32/16/16 | 4,623,178 | 1.34 | resolution in the last stage |
+| `p1_s112` | `resnet_c_s112`, strides (1,1,2), stages at 32/32/16 | 4,623,178 | 2.21 | resolution in stages 2-3 |
+| `p1_se` | `resnet_c_se`, Squeeze-and-Excitation r = 16 in every block | 4,659,046 | 0.72 | channel attention |
+
+- `p1_ens` (FM + 3-teacher ensemble) and `p1_sam` (FM + SAM) were started and stopped after about 1 minute, on the
+  design review's advice:
+  - the ensemble is at most +0.18 over `teacher_wrn300`, so its transfer is below what one run can resolve;
+  - SAM already tied without FM.
+- Long function matching (800 ep) and a SAM teacher go to NYU HPC (`scripts/hpc/`) once access works.
+
+### NYU HPC Cloud Bursting set up (2026-11-03, about 17:45 EST)
+- **Access, Fall 2026:**
+  - Only through Open OnDemand at `https://ood.burst.hpc.nyu.edu` (NYU VPN + Microsoft SSO).
+  - SSH to greene/burst is retired, and Torch is off-limits for coursework.
+  - Course account `cs_gy_6923-2026fa`: 300 GPU hours.
+  - Partitions: `c12m85-a100-1` (A100), `c24m170-a100-2`, `g2-standard-*` (L4), `n2c48m24` (CPU), `interactive`.
+  - No time limit; overlay templates in `/share/apps/overlay-fs-ext3`, images in `/share/apps/images`.
+- **Burst nodes are preemptible:**
+  - The first Jupyter session was killed mid-unzip ("Terminated") and requeued on a new host.
+  - Every job therefore uses `--requeue` plus `--resume` (checkpoints every 10 epochs).
+- **Upload:** `hpc_upload/dl1_bundle.tar` (418 MB: code, data.zip, `teacher_wrn300`, `teacher50`), uploaded to
+  `/scratch/as21153` via the OOD file browser.
+- **Submitted from a Jupyter terminal** on node b-10-147:
+  - `setup_job.sh` (job 20907, CPU): unzips the data, builds the Singularity/conda env with the CUDA 11.8 image and the
+    15 GB overlay, and caches the dataset.
+  - Training jobs, each with `--dependency=afterok:20907` on `c12m85-a100-1` (1 × A100):
+
+    | Job | Run | What |
+    |---|---|---|
+    | 20908 | `h_fm800` | resnet_c, function matching, 800 epochs, 45k, `teacher_wrn300` |
+    | 20909 | `h_final800` | the same, all 50k, `teacher50` |
+    | 20910 | `h_teacher_sam45` | WRN-28-10 + SAM ρ 0.05, 400 epochs, label smoothing 0, 45k |
+    | 20911 | `h_teacher_sam50` | the same, all 50k |
+- **Resubmitted at 17:46 EST:**
+  - Unzipping 52k PNGs onto burst `/scratch` (NFS) crawled at about 1,100 files/min, and node b-10-160 logged Slurm
+    munge auth errors.
+  - So jobs 20907-20911 were cancelled. **New `setup_job2.sh` (job 20914)** builds the env, then writes
+    `data/cache/{train,test}.npz` straight from `data.zip` in memory, with no per-image files.
+  - Training jobs **20915** `h_fm800`, **20916** `h_final800`, **20917** `h_teacher_sam45`, **20918**
+    `h_teacher_sam50` depend on it (afterok).
+  - **Lesson:** on burst, avoid many small files on /scratch; ship arrays, not image folders.
+- **Setup finished interactively (18:00 EST), after two more problems:**
+  - Job 20914 sat in node state CF (configuring) on b-10-102, so 20914-20918 were cancelled. `setup_job2.sh` ran
+    directly in the Jupyter session instead.
+  - `Miniconda3-latest` now ships **Python 3.14.9**, which has no cu118 PyTorch wheel ("No matching distribution").
+    - Fix: a conda-forge Python 3.11 env at `/ext3/py311`, activated in `/ext3/env.sh`. It runs torch 2.7.1+cu118 and
+      torchvision 0.22.1+cu118.
+    - `scripts/hpc/setup_env.sh` was updated to match.
+  - The npz cache built from `data.zip` in under 30 s ((50000, 32, 32, 3) / (2000, 32, 32, 3)), and `load_split`
+    reads it. SETUP_OK.
+  - CPU smoke test (`--subset 512`, 1 epoch, FM + `teacher_wrn300`):
+    - loads the teacher (97.85 val);
+    - resnet_c has 4,623,178 params;
+    - the epoch runs end to end.
+- **Submitted at 18:02 EST** (no dependencies; all on `c12m85-a100-1`):
+
+  | Job | Run |
+  |---|---|
+  | 20929 | `h_fm800` |
+  | 20930 | `h_final800` |
+  | 20931 | `h_teacher_sam45` |
+  | 20932 | `h_teacher_sam50` |
+
+  - All start as PD (Resources/Priority) while cloud A100 nodes power up. The partition had 144 nodes powered off
+    (`idle~`), 24 powering up and 29 allocated.
+
+### Phase 1 at about 70% (18:03 EST): val acc vs `r1_fm` at the same fraction of the schedule
+| Run | 10% | 20% | 30% | 40% | 50% | 60% | 70% |
+|---|---|---|---|---|---|---|---|
+| `p1_hr` (1,2,1) | -0.84 | -0.58 | -0.32 | -0.46 | -0.48 | -0.52 | -0.72 |
+| `p1_se` | -0.66 | -0.12 | +0.14 | -0.10 | +0.02 | -0.20 | |
+| `p1_s112` (1,1,2) | -0.36 | +0.60 | +0.26 | +0.14 | +0.32 | | |
+
+- **`p1_hr` is consistently behind.** It keeps the last stage at 16×16, which halves the receptive field of the
+  final features relative to resnet_c. The extra 0.6 GMACs go to the wrong place.
+- **`p1_s112`** keeps stages 1-2 at full 32×32 resolution and is consistently ahead (+0.14 to +0.60 since 20%), with
+  the lowest val loss of the three (0.115).
+  - Its early features see more spatial detail, and the last stage still downsamples, so the receptive field is kept.
+- **`p1_se` is tied** within the noise.
+
+### HPC jobs running (18:20 EST)
+- **Speed on one A100 (`c12m85-a100-1`), one run per GPU, AMP:**
+  - resnet_c + function matching with a WRN-28-10 teacher forward: **8.0-8.7 s/epoch**, so 800 epochs take about
+    1.9 h. Colab packed 4 runs on one A100 at about 36 s/epoch each.
+  - WRN-28-10 + SAM: **22 s/epoch**, so 400 epochs take about 2.4 h.
+- **The A100 pool is congested; the L4 pool is free.**
+  - A100: 23 jobs pending in `c12m85-a100-1`, and allocations hover near 29-31 nodes. That looks like a cloud quota
+    cap, even though `sinfo` lists 144 powered-off (`idle~`) nodes. Jobs got nodes one at a time, about 2-8 min
+    apart.
+  - L4 (`g2-standard-12`: 12 CPUs, 47 GB, 1 × L4): 0 allocated, 190 `idle~`.
+- **`p1_s112` is ahead of `r1_fm`, so the s112 runs that would be needed if it wins went to L4 right away**
+  (`--partition=g2-standard-12 --cpus-per-task=10 --mem=40GB`):
+
+  | Job | Run | What |
+  |---|---|---|
+  | 20938 | `h_s112_final300` | resnet_c_s112, FM, 300 epochs, all 50k, `teacher50` (the next submission if s112 wins) |
+  | 20939 | `h_s112_fm800` | resnet_c_s112, FM, 800 epochs, 45k twin, `teacher_wrn300` |
+  | 20940 | `h_s112_final800` | the same on all 50k, `teacher50` |
+- **State at 18:20:**
+  - Running: `h_fm800` (epoch 78/800, val 95.56), `h_final800` (55/800), `h_teacher_sam45` (2/400).
+  - Pending: `h_teacher_sam50` (A100 queue).
+  - Configuring: the three L4 jobs.
+- **L4 boot failure (18:21 EST):**
+  - All three L4 jobs sat in CF for about 7 min, then went back to PD (BeginTime) with Restarts=1, so the cloud nodes
+    never came up. Ten `g2-standard-12` nodes are drained, and nobody else had a job there: the L4 pool looks broken,
+    not free.
+  - `scontrol update partition=` is refused for requeued jobs, and the submit plugin rejects multi-partition jobs
+    ("please validate account ... or partition").
+  - So 20938-20940 were cancelled (none had started training) and resubmitted:
+
+    | Job | Run | Partition |
+    |---|---|---|
+    | 20952 | `h_s112_final300` | A100 |
+    | 20953 | `h_s112_fm800` | A100 |
+    | 20954 | `h_s112_final800` | L4 again, as a probe; it moves to A100 if it fails again |
+
+### Phase 1 results (18:40 EST): `r1_fm` is 97.66 / 97.78 flip at 300 epochs
+| Run | Final val | Flip | Δ vs `r1_fm` (none / flip) | Verdict |
+|---|---|---|---|---|
+| `p1_hr` (1,2,1) | 97.00 | 97.44 | -0.66 / -0.34 | drop: the last stage at 16×16 hurts |
+| `p1_se` (SE r = 16) | 97.42 | 97.54 | -0.24 / -0.24 | drop: no gain from channel attention with FM |
+| `p1_s112` (1,1,2) | pending | | | |
+
+- **Smoothed deltas** (15-epoch windows from epoch 150) made both drops clear before the end: `p1_hr` stayed at -0.4 to
+  -0.6, and `p1_se` slid from -0.05 to -0.47.
+- **`p1_s112` fades towards the end:** +0.20, +0.12, +0.04, -0.06 over epochs 151-210, but its val loss stays about
+  0.016 lower than `r1_fm`'s throughout.
+- **HPC at 18:38 EST:** all six A100 jobs are running. `h_s112_final800` was cancelled after its third failed L4 boot
+  (the L4 pool is unusable); it goes back on A100 if s112 wins.
+  - `h_fm800` at epoch 229/800 (29%): val 96.36, vs `r1_fm` 95.60 at the same fraction (+0.76).
+  - s112 on A100: about 10 s/epoch.
+
+### Phase 1 final + suite (19:05 EST): every arm loses to `r1_fm`
+| Run | val (none) | val (flip) | suite mean (flip) | worst (JPEG 50) | McNemar vs `r1_fm` (none / flip) |
+|---|---|---|---|---|---|
+| `r1_fm` | 97.66 | 97.78 | 96.28 | 85.66 | - |
+| `p1_s112` | 97.38 | 97.58 | 95.99 | 83.88 | 28 vs 42, p = 0.12 / 26 vs 36, p = 0.25 |
+| `p1_se` | 97.42 | 97.54 | 96.11 | 85.02 | 30 vs 42, p = 0.20 / 21 vs 33, p = 0.13 |
+| `p1_hr` | 97.00 | 97.44 | 95.86 | 84.50 | 32 vs 65, p = 0.001 / 25 vs 42, p = 0.05 |
+
+- **More FLOPs per parameter does not help under FM at 300 epochs.**
+  - Higher-resolution stages (hr, s112) and SE attention all land 0.2-0.7 below plain resnet_c, on clean val and on
+    every corruption family.
+  - s112 has the lowest val loss (0.091) but not the best accuracy: better calibrated, not more accurate. It is also
+    notably weaker on JPEG.
+- **Recipe S\* = `r1_fm` unchanged** (resnet_c + FM + `teacher_wrn300`). The remaining levers are patience (800
+  epochs) and a stronger teacher (SAM).
+- **Colab VM shut down** (`colab.py down`) at 18:52. HPC is now the main compute.
+
+### Run G submitted (19:01 EST, after the 00:00 UTC reset): public 0.901
+- `runs/r2_final_S/submission_flip.csv` (PreAct 4.98M, FM, all 50k; twin 97.58 flip): **0.901**, identical to Run F
+  (resnet_c FM, twin 97.78 flip).
+- The 0.2 twin gap is below public-LB resolution (SE about 1 point on 1,000 images). Two different architectures with
+  FM both land at 0.901, which supports FM as the lever and architecture as second-order.
+- Team submissions today (UTC Nov 4): 1 of 5 used.
+
+### HPC monitoring without a terminal (19:05 EST)
+- **Jupyter session 20883 (b-10-147) was preempted again** ("DNS lookup failure for b-10-147"). The batch jobs were
+  unaffected; they run on their own nodes.
+- **Monitoring now goes through the OOD dashboard:**
+  - Active Jobs: `/pun/sys/dashboard/activejobs?jobfilter=user`.
+  - Raw log text: `/pun/sys/dashboard/files/fs//scratch/as21153/dl1/runs/RUN/train.log`, fetched from the page
+    with JS.
+  - No CPU node needed.
+- **Progress vs baselines at the same fraction of the schedule:**
+  - `h_fm800`: 413/800 (52%), val 96.88, vs `r1_fm` 96.59 (+0.29). Patience looks like it helps.
+  - `h_s112_fm800`: 195/800 (24%), 96.24, vs 95.39 (expected to lead early: more epochs at each fraction).
+  - `h_teacher_sam45`: 124/400 (31%), 96.40, vs `teacher_wrn300` 96.21 (+0.19).
+  - `h_final800` at 366/800, `h_teacher_sam50` at 79/400, `h_s112_final300` at 182/300.
+
+### HPC milestone (19:35 EST): leads narrowing as the runs converge
+| Run | Epoch | Val | Same fraction of the baseline (11-epoch mean) | Δ |
+|---|---|---|---|---|
+| `h_fm800` | 649/800 (81%) | 97.50 | `r1_fm` 97.41 | +0.09 (was +0.29 at 52%, +0.24 at 67%) |
+| `h_s112_fm800` | 393/800 (49%) | 96.92 | `r1_fm` 96.44 | +0.48 |
+| `h_teacher_sam45` | 212/400 (53%) | 97.08 | `teacher_wrn300` 97.01 | +0.07 (was +0.41 at 42%) |
+
+- `h_s112_final300` is done (300/300). It will not be submitted.
+- **Pattern:** longer schedules (and SAM) lead mid-run but converge towards the baseline in the low-LR phase. The
+  same happened with 500 vs 300 epochs without FM (a tie).
+  - Final gains are likely ≤0.2. Single-epoch val on 5k has SD about 0.2, so wait for the final + flip + McNemar.
+- `h_fm800` config is identical to `r1_fm` except epochs (checked by diffing the configs), so it is a clean one-factor
+  test.
+
+### Patience works: `h_fm800` 97.84 / 98.00 flip, the first student ≥98 (20:00 EST)
+- **Result vs `r1_fm` (the same recipe at 300 epochs, 97.66 / 97.78):** +0.18 / +0.22.
+  - McNemar: 38 vs 29, p = 0.33 (none); 27 vs 16, p = 0.13 (flip).
+  - Suite mean (flip): 96.49 vs 96.28, better on 10 of 11 corruptions (JPEG 85.32 vs 85.66).
+  - Agreement with `teacher_wrn300`: 98.90% (flip), KL 0.024.
+  - **Adopted** by the Phase 1 rule (mean Δ 0.20 ≥ 0.15, no suite drop).
+- **The curve:** it led by +0.29 at 52%, narrowed to +0.09 at 81%, then gained again in the last 20% (the final low-LR
+  phase). Mid-run deltas under-predict the end.
+- **`h_final800`** (all 50k, `teacher50`, 800 epochs) finished at 20:06, exit 0. Downloaded through the OOD file
+  browser (a top-level navigation to `...?download=1`; scripted blob downloads get blocked after the first).
+  - `runs/h_final800/submission_flip.csv`: 2,000 rows in sample order, balanced classes.
+  - Agreement with Run F 95.80%, with Run G 95.90% (F vs G 95.45%).
+  - **Ready to submit as Run H**, waiting for the user's OK.
+- **Next round submitted at 20:10 EST** (new Jupyter session 21028 on b-10-70, after 20883 was preempted):
+
+  | Job | Run | What |
+  |---|---|---|
+  | 21029 | `h_fm1600` | resnet_c FM 1600 epochs, 45k, `teacher_wrn300` (does patience keep paying?) |
+  | 21030 | `h_final1600` | the same on all 50k, `teacher50` |
+  | 21031 | `h_fm800_sam` | FM 800 epochs with the SAM teacher `h_teacher_sam45`; afterok:20931 |
+  | 21032 | `h_final800_sam` | the same on 50k with `h_teacher_sam50`; afterok:20932 |
+
+### Run H submitted (20:15 EST): public 0.897
+- `runs/h_final800/submission_flip.csv` (resnet_c FM 800 epochs, all 50k, twin 98.00 flip): **0.897**, vs Run F 0.901
+  (twin 97.78) and Run G 0.901 (twin 97.58).
+- **Within noise:**
+  - H and F disagree on 4.2% of the 2,000 hidden images, about 42 on the public half. -0.4 is 4 images.
+  - Public SE is about 1 point (1,000 images). Three FM models with twins 97.58-98.00 score 0.897-0.901, so the
+    public LB cannot rank them.
+- **Final selection stays by twin val, per the plan.** Run H has the best twin (98.00 flip, p = 0.13 vs `r1_fm`,
+  better on 10 of 11 corruptions). The private 1,000 images decide the ranking.
+- Team submissions today (UTC Nov 4): 2 of 5 used (G, H).
+
+### 20:36 EST
+- **`h_fm1600` (21029) was cancelled by the system** (uid 0) after about 12 min in node configuration on b-19-25. It
+  wrote no log, so the cloud node failed to boot. Resubmitted as **21053**. `h_final1600` (21030) is running (epoch
+  81/1600, 8.5 s/epoch).
+- **`h_teacher_sam45`** at 376/400: val 98.06; `teacher_wrn300` ended at 97.96.
+- `h_s112_fm800` at 768/800: 97.70.
+
+### SAM teacher and ensemble (20:50 EST)
+| Teacher | val | flip | McNemar vs `teacher_wrn300` (none / flip) |
+|---|---|---|---|
+| `teacher_wrn300` (300 ep) | 97.96 | 97.90 | - |
+| `h_teacher_sam45` (SAM ρ 0.05, 400 ep, LS 0) | 98.04 | 98.02 | 37 vs 33, p = 0.72 / 31 vs 25, p = 0.50 |
+| `teacher_wrn300` + `h_teacher_sam45` (avg softmax) | 98.12 | 98.08 | 18 vs 10, p = 0.19 / 15 vs 6, p = 0.08 |
+
+- **The SAM teacher is a tie** (+0.08), below the plan's 98.2 bar. Its single-teacher students are replicates.
+  - `h_final800_sam` gets cancelled.
+  - `h_fm800_sam` stays as a noise calibration: an equal-strength teacher plus a different run gives the run-to-run
+    spread at 800 epochs.
+- **`h_s112_fm800` final: 97.76 / 97.72.** s112 does not catch up with patience either (`h_fm800` 97.84 / 98.00).
+- **The student has reached the teacher.** `h_fm800` is at 97.84 against the teacher's 97.96 (none), and with flip it
+  exceeds it (98.00 vs 97.90), with 98.9% agreement. Under FM the teacher is now the bottleneck, which reverses the
+  Round 3 finding (the student was the bottleneck under plain KD).
+  - **Next lever: a stronger teacher target.** The 2-ensemble is +0.16 / +0.18. More seeds should push it towards
+    about 98.3.
+- **Planned jobs** (blocked: Jupyter 21028 on b-10-70 was preempted before the commands ran):
+  - `h_fm800_ens2` (FM 800 with `teacher_wrn300` + `h_teacher_sam45`);
+  - `h_fm800_a1` (kd-alpha 1.0);
+  - `h_fm800_nn` (no student noise);
+  - teachers `h_teacher_sam45_s1` and `_s2` (seeds 1 and 2, for a 4-teacher ensemble).
+- **Preemption is widespread right now:**
+  - `h_fm1600` (21053) was requeued after 9 min of running;
+  - `h_fm800_sam` (21031) after 2 min;
+  - both resume from `last.pt`.
+
+### 21:07 EST: cloud node provisioning failing
+- **Jupyter sessions:**
+  - 21066 (`n2c48m24`) ended without starting.
+  - The `interactive` partition rejects `--mem=4G` ("Memory specification can not be satisfied"), so 21068 was
+    launched there with no memory option; still queued after 5 min.
+- **Batch jobs:**
+  - `h_fm1600` (21053) disappeared from the queue after a requeue, again without a log.
+  - `h_fm800_sam` (21031) has used about 4 min on nodes across requeues and never wrote a log: its nodes fail during
+    configuration.
+  - Jobs already on healthy nodes are fine: `h_teacher_sam50` at 391/400, `h_final1600` at 293/1600.
+- **Lessons:** keep long jobs running rather than resubmitting, and submit follow-ups with `--dependency` while a
+  terminal is up (the terminal is the scarce resource).
+
+### Round 6 submitted (21:45 EST), via the JupyterLab terminal API
+- **Terminal access:**
+  - Jupyter 21086 (`n2c48m24`, b-10-122) started after about 10 min. 21068 on `interactive` never left the queue
+    and was cancelled.
+  - Screenshots of the lab tab time out, so the terminal is driven from page JS:
+    - `POST /node/HOST/PORT/api/terminals` creates a terminal;
+    - a WebSocket to `/terminals/websocket/NAME` sends stdin and reads stdout;
+    - the script was written with `PUT /api/contents/dl1/submit_round6.sh`.
+  - This avoids keyboard-focus problems. A copy of the script is in `scripts/hpc/submit_round6.sh`.
+- **Jobs:**
+
+  | Job | Run | What |
+  |---|---|---|
+  | 21135 | `h_fm1600` | resubmitted twin, 1600 ep |
+  | 21136 | `h_fm800_ens2` | FM 800 with `teacher_wrn300` + `h_teacher_sam45` (98.12 / 98.08 ensemble) |
+  | 21137 | `h_final800_ens2` | 50k version with `teacher50` + `h_teacher_sam50` |
+  | 21138 | `h_fm800_a1` | kd-alpha 1.0 (pure distillation, as in Beyer et al.) |
+  | 21139 | `h_fm800_nn` | student noise 0 |
+  | 21140-21141 | `h_teacher_sam45_s1/_s2` | WRN-28-10 SAM 400 ep, seeds 1-2, 45k |
+  | 21142-21143 | `h_teacher_sam50_s1/_s2` | the same on 50k |
+  | 21144 | `h_fm800_ens4` | FM 800 with 4 teachers (wrn300, sam45, sam45_s1, sam45_s2); afterok:21140:21141 |
+  | 21145 | `h_final800_ens4` | 50k: teacher50, sam50, sam50_s1, sam50_s2; afterok:21142:21143 |
+
+- **Still queued from before:** `h_fm800_sam` (21031, noise-calibration replicate) and `h_final800_sam` (21032).
+- **Running:** `h_final1600` (21030).
+- **Expected:**
+  - if nodes come up, the 800-epoch one-factor runs finish about 2 h after start, and the teachers about 2.5 h;
+  - the 4-teacher students (about 16 s/epoch, about 3.6 h) finish around 05:00-06:00 Nov 4.
+
+### Run H post-mortem and two cheap levers (22:30 EST; read-only analysis on the hidden set + twin val)
+- **Run H's 0.897 is most likely noise.**
+  - H vs F disagree on 84 of the 2,000 hidden images, about 42 on the public half, so -0.4 is 4 net images (SD of the
+    net change about 0.65 pt).
+  - At the literature CIFAR-10 → CIFAR-10.1 probit slope (1.0-1.2), a 98.00 twin maps to about 90.7-90.9, so H was
+    1.5-1.9 SD under expectation.
+  - On the 84 disagreements, G sides with H 42 vs 33 and teacher50 41 vs 32. All share the teacher, so this is weak
+    evidence.
+- **Shared class bias on the hidden set:**
+
+  | Model | airplane | frog | automobile | dog | Σ\|n−200\| |
+  |---|---|---|---|---|---|
+  | F | 177 | 185 | 217 | 205 | 98 |
+  | G | 176 | 183 | 217 | 216 | 94 |
+  | H | 177 | 179 | 220 | 212 | 114 |
+  | teacher50 | 172 | 181 | 224 | 214 | 114 |
+
+  - H copies the teacher more closely (agreement 95.6% vs F 95.15%), bias included.
+  - Mean max-prob is 0.96 for all students.
+- **Wider TTA (flip_shift, 10 views) vs flip on the twin val: a tie, not adopted.**
+  - `h_fm800`: clean +0.04, suite mean +0.06.
+  - `r1_fm`: clean -0.14, suite +0.03.
+  - It helps only JPEG (+0.2 to +0.6).
+- **Class-balanced decoding (Sinkhorn to a uniform class marginal), twin val (exactly 500 per class), `h_fm800` /
+  `r1_fm`:**
+
+  | Shift | Gain from balancing |
+  |---|---|
+  | clean | -0.08 / 0.00 |
+  | sharpen | +0.22 / +0.16 |
+  | blur | +0.08 / +0.06 |
+  | JPEG | +1.38 / +1.14 |
+  | suite mean | +0.15 / +0.12 |
+
+  - The gain grows with prediction imbalance; the hidden set's imbalance is about 5% of N. Expected +0.3 to +0.7 pt,
+    if the hidden set is class-balanced (2,000 images = CIFAR-10.1 v6 size, 200 per class).
+  - Added as `src.predict --balance` (`balance_probs`), off by default. On Run H it changes 75 of 2,000 predictions.
+  - **Not to be submitted until the professor approves** (the user is asking).
+
+### 22:36 EST: the HPC cloud is still failing to start nodes
+- **`h_final1600`** at 908/1600 (on b-19-44 since 20:10, unaffected); done about 00:20.
+- **Gone again:** `h_fm1600` (21135) and `h_fm800_sam` (21031) vanished after failed node starts. Jupyter 21086 also
+  ended.
+- **Still queued:** all other Round 6 jobs. Several briefly got nodes (00:00:18 to 00:07:19 of time used) and were
+  requeued without writing a log, so the nodes fail during configuration.
+- **Next:**
+  - New Jupyter 21249 was requested so `h_fm1600` and `h_fm800_sam` can be resubmitted.
+  - The Colab fallback decision is at 23:30, per the plan.
+
+### 22:52 EST: babysitter for jobs cancelled by Slurm
+- **Diagnosis:** `h_fm800_a1` (21138) shows "CANCELLED by 0" after 11:51 in configuration on b-19-69, with no log.
+  Slurm cancels (does not requeue) a job whose cloud node fails to boot within its resume timeout. The earlier losses
+  of `h_fm1600` (twice) and `h_fm800_sam` were the same.
+- **Fix: `scripts/hpc/babysit.sbatch` (job 21260)**, on a CPU node with 1 CPU, 2 GB, 48 h, requeue.
+  - Every 5 min it reads `runs/jobs.txt` (local copy: `scripts/hpc/jobs_round6.txt`) and resubmits any run that is not
+    queued and has no `runs/NAME/final.pt`. `--resume` continues from `last.pt`.
+  - Each run is capped at 8 submissions.
+  - Runs that need other runs first (the ens4 students) wait until those runs' final.pt files exist. The Slurm-dependency
+    versions (21144/21145) were cancelled: a dependency on a cancelled teacher ID would never be satisfied.
+- **Queue at 22:52:**
+  - running: `h_final1600`, `h_teacher_sam50_s2`;
+  - configuring: `h_final800_sam`, `h_fm800_nn`, `h_teacher_sam45_s1/_s2`, `h_teacher_sam50_s1`;
+  - pending: `h_fm800_ens2`, `h_final800_ens2`;
+  - the babysitter resubmits `h_fm1600`, `h_fm800_a1` and `h_fm800_sam`.
+- Jupyter 21249 is on b-10-70.
+- **22:54 EST, the babysitter works:**
+  - In its first loop it resubmitted `h_fm1600` (21262), `h_fm800_a1` (21263) and `h_fm800_sam` (21264).
+  - At 03:52 UTC it resubmitted `h_teacher_sam45_s1/_s2` (21268/9), `h_teacher_sam50_s1` (21270) and `h_fm800_nn`
+    (21271), after the originals were cancelled following 14:50 in CF.
+  - Running: `h_final1600` 1039/1600 (done about 00:15), `h_teacher_sam50_s2` 23/400 (24 s/epoch).
+
+### 23:35 EST: babysitter preempted, and OOD can no longer launch interactive sessions
+- **Babysitter 21260 killed by preemption:** "JOB 21260 ON b-10-122 CANCELLED AT 2026-11-04T04:21:01 DUE to SIGNAL
+  Terminated". CPU-partition jobs are cancelled on spot preemption, not requeued, despite `--requeue`.
+  - Before dying it resubmitted `h_fm1600` (#2, 21280), `h_fm800_ens2` (21281) and `h_final800_ens2` (21282).
+  - Fix for its next start: `trap 'sbatch scripts/hpc/babysit.sbatch; exit 0' TERM` with `sleep 300 & wait`, so it
+    hands over to a fresh copy.
+- **Jupyter 21249 also ended.** Launching a new Jupyter or Code Server session now fails every time with "This app
+  does not supply a sub app form file under the directory '/var/www/ood/apps/sys/burst_jupyter/local'" (and
+  `.../burst_codeserver/local`). This is server-side, so there is no terminal and no way to submit until OOD recovers.
+- **Running (6):**
+
+  | Run | Epoch | Val |
+  |---|---|---|
+  | `h_final1600` | 1257/1600 | - |
+  | `h_teacher_sam50_s2` | 99/400 | - |
+  | `h_final800_sam` | 151/800 | - |
+  | `h_fm800_a1` | 160/800 | 96.04 |
+  | `h_teacher_sam45_s1` | 40/400 | 94.24 |
+  | `h_fm800_sam` | 117/800 | 95.94 |
+
+- **Queued with no babysitter:** `h_fm1600`, `h_fm800_ens2`, `h_final800_ens2`, `h_fm800_nn`, `h_teacher_sam45_s2`,
+  `h_teacher_sam50_s1`.
+- **Not yet submitted:** the ens4 students (they need the babysitter, or a terminal once their teachers exist).
+- The OOD login session also expires every few minutes now, so a reload is needed before each log fetch.
+
+### 23:58 EST: portal back, babysitter v2 running
+- **OOD interactive apps work again.** Jupyter 21699 is on b-10-104.
+- **Babysitter v2 (21713):**
+  - A TERM trap resubmits it when its spot node is preempted.
+  - `sleep 300 & wait` lets the trap fire immediately.
+  - It exits if another copy is already running.
+- **Nothing was lost during the outage.**
+  - Running (6): `h_final1600` 1425/1600, `h_fm800_a1`, `h_fm800_sam`, `h_final800_sam`, `h_teacher_sam45_s1`,
+    `h_teacher_sam50_s2`.
+  - `h_teacher_sam50_s1` is in CF.
+  - `h_fm1600`, `h_fm800_ens2`, `h_final800_ens2`, `h_fm800_nn` and `h_teacher_sam45_s2` are pending on Priority:
+    fairshare now ranks us below others, since we hold 6 GPUs.
+- **Early one-factor readings** vs `h_fm800` at the same epoch (11-epoch mean):
+  - `h_fm800_a1` (pure KD) at 336: 96.44 vs 96.78 (-0.34);
+  - `h_fm800_sam` (SAM teacher) at 293: 96.78 vs 96.53 (+0.25);
+  - mid-run deltas under-predicted the end for `h_fm800`, so wait for the finals.
+
+### 00:16 EST Nov 4: `h_final1600` done
+- **`h_final1600`** (resnet_c FM 1600 epochs, all 50k, `teacher50`) finished with exit 0. Downloaded;
+  `runs/h_final1600/submission_flip.csv` written.
+  - Hidden-set class counts: airplane 176, automobile 224, frog 182; Σ\|n−200\| = 98.
+  - Agreement with H 96.15%, F 95.90%, G 95.70%.
+  - **Held until its twin `h_fm1600` (pending) confirms 1600 > 800.**
+- **The babysitter (21713) works:** it resubmitted `h_teacher_sam50_s1` (#2, 21732) after another failed boot.
+- **Pending on Priority** (fairshare): `h_fm800_ens2` / `h_final800_ens2` / `h_fm1600` at 12171 (top), `h_fm800_nn`
+  at 12171, teachers at 12168-12169. `scontrol update nice` and `scontrol hold` are both refused, so own-job
+  priorities cannot be reordered.
+- **Running:**
+
+  | Run | Epoch | Val | Done (EST) |
+  |---|---|---|---|
+  | `h_fm800_a1` | 514/800 | 97.04 | about 00:55 |
+  | `h_fm800_sam` | 479/800 | 97.16 | about 01:00 |
+  | `h_final800_sam` | 495/800 | - | about 01:00 |
+  | `h_teacher_sam50_s2` | 222/400 | - | about 01:25 |
+  | `h_teacher_sam45_s1` | 169/400 | 97.18 | about 01:40 |
+
+### 01:00 EST Nov 4: first Round 6 one-factor finals (vs `h_fm800` 97.84 / 98.00)
+| Run | Change | val | flip | Δ (none / flip) | Verdict |
+|---|---|---|---|---|---|
+| `h_fm800_a1` | kd-alpha 1.0 (pure KD) | 97.64 | 97.82 | -0.20 / -0.18 | drop: the CE term helps |
+| `h_fm800_sam` | single SAM teacher (98.04 / 98.02) | 97.86 | 97.78 | +0.02 / -0.22 | tie: not adopted |
+
+- **`h_fm800_sam` led by +0.28 at 60% and finished at a tie.** This is the third time a mid-run lead vanished in the
+  low-LR phase.
+- **It doubles as a noise calibration:** an equal-strength teacher gives a twin within ±0.2 of `h_fm800`. The 800 vs
+  300 gain (+0.18 / +0.22) is the same size, so treat single-twin deltas under about 0.2 as unresolved.
+- **`h_final800_sam`** (50k, SAM teacher) is done, exit 0, and downloaded. It is not submitted (its twin did not
+  clear the bar). Keep it as a diverse option for the final 2 picks.
+- **Started:** `h_fm1600` (85/1600 at 00:56, done about 04:30) and `h_fm800_nn` (97/800, done about 02:20).
+- **Still pending:** `h_fm800_ens2`, `h_final800_ens2`, `h_teacher_sam45_s2`, `h_teacher_sam50_s1`.
+- **Teachers:** `h_teacher_sam45_s1` at 283/400 (97.70), `h_teacher_sam50_s2` at 327/400.
+
+### 01:50 EST Nov 4: diverse teachers queued, without a terminal
+- **The babysitter's TERM trap worked:** 21713 was preempted, resubmitted itself as **21886**, and kept going. It also
+  re-queued `h_fm800_ens2` as 21863.
+- **Jupyter 21699 ended as well.** Files are now edited without any terminal, through the OOD Files API from the
+  dashboard page: `PUT /pun/sys/dashboard/files/fs//scratch/...` with the page's `csrf-token`, read back to verify.
+- **Done that way:**
+  - `wrn40_10` (55.8M) added to `TEACHER_CONFIGS` in the HPC `src/models.py` (and locally);
+  - 4 diverse teachers appended to `runs/jobs.txt` for the babysitter to submit.
+
+    | Run | What |
+    |---|---|
+    | `h_teacher_aa45` / `_aa50` | WRN-28-10, AutoAugment (CIFAR-10 policy), SAM 0.05, 400 ep, LS 0, seed 3 |
+    | `h_teacher_w40_45` / `_w40_50` | WRN-40-10, TrivialAugment, SAM 0.05, 300 ep, LS 0, seed 4 |
+
+- **Why:** every ensemble of our current models saturates at 98.16. The models share the WRN-28-10 + TrivialAugment
+  recipe, so their errors correlate. A different augmentation policy and a different depth should decorrelate them.
+- **Per-class specialist ideas checked and rejected:**
+  - teacher oracle per class 95 errors vs averaging 94;
+  - student routing 99 vs best single 100.
+- **Transductive kNN smoothing** (10 feature-space neighbours, w 0.5) on the shifted val: suite mean +0.18, +0.42
+  together with balancing, clean ±0. It needs the same professor approval as balancing.
+- **State 01:45:**
+  - running: `h_fm1600` (21280), `h_fm800_nn` (21271), `h_teacher_sam45_s1` (21268), babysitter 21886;
+  - queued: `h_fm800_ens2` (21863), `h_final800_ens2` (21282), `h_teacher_sam45_s2` (21269), `h_teacher_sam50_s1`
+    (21732);
+  - done: `h_teacher_sam50_s2`.
+- **01:35 EST:** the babysitter submitted `h_teacher_aa45` / `_aa50` / `_w40_45` / `_w40_50` as jobs 21956-21959.
+  - `h_teacher_sam45_s1` is at 387/400 with val **98.18** (the first SAM teacher ended at 98.04).
+  - `h_teacher_sam50_s2` is done.
+  - `h_fm800_nn` at 427/800 (97.00); `h_fm1600` at 367/1600 (96.40), done about 04:20.
+- **01:50 EST: `h_teacher_sam45_s1` final 98.18 / 98.22 flip (best 98.24)**, the best single teacher so far
+  (`teacher_wrn300` 97.96 / 97.90, `h_teacher_sam45` 98.04 / 98.02).
+  - Added `h_fm800_ens3` (`teacher_wrn300` + `sam45` + `sam45_s1`) and `h_final800_ens3` (`teacher50` + `sam50` +
+    `sam50_s2`) to `runs/jobs.txt`.
+  - Their teachers all exist now, so they can start on the next free A100, ahead of ens4. ens4 still waits for
+    `sam45_s2` / `sam50_s1`, which have not started.
+  - `h_fm800_nn` at 546/800 (97.48); `h_fm1600` at 466/1600 (96.72).
+
+### 02:20 EST Nov 4: `h_fm800_nn` result; queue re-prioritized
+- **`h_fm800_nn`** (student noise 0): 97.84 / 97.90 vs `h_fm800` 97.84 / 98.00, a tie. Student noise does not matter
+  under FM, so the recipe stays.
+- **The babysitter was preempted again** (06:51 UTC) and resubmitted itself as 22019, which submitted `h_fm800_ens3`
+  / `h_final800_ens3` (22023/22024).
+- **The cluster is saturated:** only `h_fm1600` (697/1600) is running, with 10 of our jobs pending. Slurm runs our
+  oldest pending jobs first, which would put the dominated ens2 and same-recipe seeds ahead of ens3 and the diverse
+  teachers.
+- **Decision:**
+  - Disable (comment out in `runs/jobs.txt`) and cancel `h_fm800_ens2`, `h_final800_ens2`, `h_teacher_sam45_s2` and
+    `h_teacher_sam50_s1`, plus the ens4 chain that depends on them.
+  - **Keep:** `h_fm800_ens3` / `h_final800_ens3` (98.18 teacher included), then the diverse teachers `aa45` / `aa50` /
+    `w40_45` / `w40_50`, then a diverse-ensemble student pair.
+- The cancels need a terminal: Jupyter 22127 requested.
+- **02:35 EST, terminal-free control:** Jupyter 22127 got b-10-10 ("DNS lookup failure"), then fell back to Queued.
+  - Babysitter v3 was written to `scripts/hpc/babysit.sbatch` via the Files API. The running copy (22019, v2) has
+    already parsed its loop, so it is unaffected; the next copy after a preemption runs v3.
+  - **v3 adds:**
+    - `runs/inbox/*.sh`: one-off commands, each run once per pass, with output in `runs/inbox/done/NAME.out`;
+    - `runs/babysit/squeue.txt`: a queue snapshot every pass.
+  - Dropped in `runs/inbox/cancel_ens2_seeds.sh` (`scancel 21863 21282 21269 21732`). The `runs/inbox` dir was
+    created with `PUT ...?dir=true`.
+- **03:00 EST: babysitter v3 is live** (its `runs/babysit/squeue.txt` exists). The inbox cancel ran: ens2 and the
+  sam45_s2 / sam50_s1 seeds are gone.
+  - **Queue:** `h_fm1600` running (993/1600, val 97.36, done about 04:20). Pending on Priority: `h_fm800_ens3` /
+    `h_final800_ens3` (22023/4) and the 4 diverse teachers (21956-9).
+  - **Reorder:** our own pending jobs start oldest-first, so `runs/inbox/reorder_teachers.sh` cancels 21956-9. The
+    babysitter resubmits them in the same pass with newer IDs, putting the ens3 students first.
+- **03:10 EST:** the reorder ran. Pending order is now `h_final800_ens3` / `h_fm800_ens3` (22023/4), then teachers
+  `w40_50` / `w40_45` / `aa50` / `aa45` (22257-60). `h_fm1600` is running; babysitter 22153; Jupyter 22127 is finally
+  up on b-10-107.
+- **04:25 EST: `h_fm1600` finished, a tie, not adopted.**
+
+  | Model | val none / flip | suite mean none / flip | JPEG 50 flip |
+  |---|---|---|---|
+  | `h_fm1600` | 97.86 / 97.86 | 96.41 / 96.55 | 86.00 |
+  | `h_fm800` | 97.84 / 98.00 | 96.25 / 96.49 | 85.32 |
+
+  - Paired disagreements: 31 vs 30 (none, p = 1.0) and 23 vs 30 (flip, p = 0.41).
+  - Δ is +0.02 / -0.14 clean, under the +0.15 rule. **`h_final1600` is not submitted on merit.** It stays a candidate
+    only as a decorrelated pick or a spare-slot reading.
+  - **All 6 other GPU jobs are running** (09:12 UTC snapshot), with done times in EST:
+
+    | Run | Progress | Val | Done |
+    |---|---|---|---|
+    | `h_fm800_ens3` | 265/800 | 96.48 | about 06:25 |
+    | `h_final800_ens3` | 245/800 | – | about 06:40 |
+    | `h_teacher_aa45` | 159/400 | 96.70 | about 05:50 |
+    | `h_teacher_aa50` | 139/400 | – | about 06:05 |
+    | `h_teacher_w40_45` | 94/300 | 96.28 | about 06:15 |
+    | `h_teacher_w40_50` | 50/300 | – | about 06:50 |
+
+  - The babysitter was preempted again and is now 22367. `w40_50` was resubmitted as 22352 after a failed boot.
+- **05:50 EST: the first diverse teacher confirms the diversity hypothesis.**
+  - `h_teacher_aa45` (WRN-28-10, AutoAugment, SAM, 400 epochs) scored 97.86 / 97.88 flip. It is the weakest teacher
+    alone, but it disagrees with the TrivialAugment teachers on 1.40-1.84% of val images, against 0.98-1.26% within
+    the family.
+  - The new teacher-set ensembles (flip val, cached probs in the scratchpad `teacher_pool.py`):
+
+    | Teacher set | acc | NLL |
+    |---|---|---|
+    | sam45 + sam45_s1 + aa45 | **98.38** | 0.0572 |
+    | wrn300 + sam45 + sam45_s1 + aa45 | 98.26 | **0.0566** |
+    | ens3 (wrn300 + sam45 + sam45_s1), without aa45 | 98.18 | 0.0570 |
+
+  - So +0.1-0.2 comes from one diverse member. The subset maximum is optimistic: 11 subsets are scored on one 5k val,
+    so NLL is the tie-break.
+  - Waiting on `h_teacher_w40_45` (259/300, val 97.98) before choosing the set.
+  - Others: `h_fm800_ens3` 665/800 (97.66); `aa50` 369/400; `w40_50` 202/300.
+- **06:20 EST: the WRN-40-10 teacher is strong but not diverse; queued the diverse students (Round 7).**
+  - `h_teacher_w40_45`: 98.00 / 98.14 flip at 300 epochs, NLL 0.061. It disagrees with the SAM/TrivialAugment
+    WRN-28-10s on only 0.84-0.92% of images. Depth adds little diversity; the augmentation policy is what
+    decorrelates errors (`aa45` is at 1.32-1.84%).
+  - Teacher-pool ensembles (5 teachers, 26 subsets, flip val):
+
+    | Teacher set | acc | NLL |
+    |---|---|---|
+    | sam45_s1 + aa45 + w40_45 | 98.40 | 0.0572 |
+    | **sam45 + sam45_s1 + aa45 + w40_45** | **98.38** | **0.0562** |
+    | all 5 | 98.28 | 0.0558 |
+    | ens3 | 98.18 | 0.0570 |
+
+  - **Chosen: the 4-teacher set.** It is top-tier on accuracy, second-best on NLL, and doesn't hinge on the single
+    max subset. `teacher_wrn300` (no SAM, NLL 0.070) is dropped.
+  - `runs/jobs.txt` (local copy `scripts/hpc/jobs_round6.txt`) got Round 7:
+    - **`h_fm800_div`:** twin, 45k teachers sam45, sam45_s1, aa45, w40_45.
+    - **`h_final800_div`:** 50k teachers sam50, sam50_s2, aa50, w40_50. It needs `w40_50`, done about 06:45.
+    - **Second diverse teacher round:**
+      - `h_teacher_aa45_s2` / `aa50_s2`: AutoAugment, seed 5;
+      - `h_teacher_w40aa45` / `w40aa50`: WRN-40-10 + AutoAugment, seed 6.
+
+      They are gated on `w40_50`, so the `div` final is submitted first and keeps priority. That feeds a possible
+      `div2` student (6 teachers).
+  - AugMix teachers are skipped because AugMix is CPU-bound (about 60 s/epoch on 12 CPUs).
+  - OOD note: a `HEAD` on a missing file returns 200. Check existence with the directory listing (`Accept:
+    application/json`).
+- **06:20 EST, submission plan (the user's decision):** only 1 submission today, the `h_final800_div` final at about
+  11:00 EST. Nothing is submitted before then; `ens3` is scored for reference only.
+  - Team slots, Nov 4 UTC day: 3 of 5 used (Run G, Run H, and a teammate's `submission.csv` at 05:35 UTC, 0.887).
+- **06:30 EST: `h_fm800_ens3` (3-teacher target 98.18) does not beat `h_fm800`.**
+
+  | Model | val none / flip | suite mean none / flip | JPEG 50 flip |
+  |---|---|---|---|
+  | `h_fm800_ens3` | 97.72 / 97.80 | 96.45 / 96.61 | 86.62 |
+  | `h_fm800` | 97.84 / 98.00 | 96.25 / 96.49 | 85.32 |
+
+  - McNemar 29 vs 35 (p = 0.53) and 22 vs 32 (p = 0.22). Clean is -0.12 / -0.20 and the suite is +0.20 / +0.12, so it
+    is not adopted.
+  - **Student vs its own target** (flip val; "lost" = teacher right and student wrong, "gained" = the reverse):
+
+    | Student | acc | target | agree | lost | gained | KL |
+    |---|---|---|---|---|---|---|
+    | `h_fm800` | 98.00 | 97.90 | 98.90% | 23 | 28 | 0.024 |
+    | `h_fm1600` | 97.86 | 97.90 | 98.58% | 35 | 33 | 0.027 |
+    | `h_fm800_ens3` | 97.80 | 98.18 | 99.02% | 32 | 13 | 0.017 |
+
+  - The ens3 student matches its target more closely (KL 0.017) but does not inherit the ensemble's extra correct
+    answers. Those sit at the decision margin, where the student's own errors return.
+  - **The distillation temperature is not the cause.** Averaging the members at T = 1 / 2 / 4 gives the same target
+    accuracy (ens3 98.18 / 98.16 / 98.16; div 98.38 at all three).
+  - **Revised view:** every 800-epoch FM student lands at 97.78-98.00 flip (mean about 97.86), whether its target is
+    97.90 or 98.18. `h_fm800`'s 98.00 is the high end of that noise, and the student recipe/capacity is the ceiling,
+    not the teacher.
+  - Expect `h_fm800_div` (target 98.38) at about 97.85-98.05, a likely tie. It is still a sound candidate for the
+    11:00 submission: equal expected accuracy, and decorrelated from Runs F/G/H for the final 2 picks.
+- `h_fm800_div` started 06:19 EST (job 22388, 19.0 s/epoch, done about 10:35). `h_final800_div` starts after `w40_50`
+  (259/300), so it is done about 11:15.
+- **06:55 EST:** `h_final800_div` is running (epoch 2, 20.7 s/epoch, done about 11:30). `h_fm800_div` is at 97/800 (val
+  96.00, done about 10:30). The second-round teachers have started.
+  - `h_final800_ens3` is downloaded, with predictions in `runs/h_final800_ens3/submission_flip.csv` (not submitted).
+    Its class counts are as lopsided as the others (airplane 172, automobile 217).
+  - Hidden-set disagreement between candidate finals: G vs H 82, H vs 1600 77, H vs ens3 77, 1600 vs ens3 68. The
+    candidates differ on 3.4-4.4% of images.
+- **08:45 EST midpoint:** all 6 jobs are running, with no preemptions.
+  - `h_fm800_div` is at 452/800. Mean val over epochs 442-452:
+
+    | Run | val |
+    |---|---|
+    | `h_fm800_div` | 96.98 |
+    | `h_fm800_ens3` | 96.97 |
+    | `h_fm800` | 96.99 |
+    | `h_fm800_sam` | 97.18 |
+    | `h_fm800_nn` | 97.15 |
+
+    `div` is tracking the pack, so a tie is expected. Twin done about 10:35; `h_final800_div` (322/800) about 11:35.
+  - Round 2 teachers: `aa45_s2` 304/400 (97.58), `aa50_s2` 278/400, `w40aa45` 202/300 (97.34), `w40aa50` 185/300.
+- **10:40 EST: `h_fm800_div` (4-teacher diverse target, 98.38) ties `h_fm800`.**
+
+  | Model | val none / flip | suite mean none / flip | JPEG 50 flip |
+  |---|---|---|---|
+  | `h_fm800_div` | 97.92 / 97.82 | 96.47 / 96.59 | 86.58 |
+  | `h_fm800` | 97.84 / 98.00 | 96.25 / 96.49 | 85.32 |
+
+  - McNemar 34 vs 30 (p = 0.71) and 28 vs 37 (p = 0.32).
+  - It is the best no-TTA twin so far, but flip costs it 0.10 (noise). Under the agreed plan it is still today's
+    submission (`h_final800_div`, flip TTA as for every run), when it lands about 11:30.
+  - **Round 2 teachers:**
+    - `aa45_s2`: 97.86 / 98.06 flip, NLL 0.071.
+    - `w40aa45`: 97.58 / 97.70, NLL 0.074.
+    - They disagree with the TrivialAugment teachers on 1.3-1.6%, but only 1.06-1.20% with `aa45`.
+    - **The teacher pool saturates:** the best 6-teacher set is 98.38 and the best 4-teacher set 98.36-98.40, the same
+      as `div`. No `div2` student is queued.
+  - **Conclusion:** both ceilings are reached.
+
+    | | Range |
+    |---|---|
+    | teacher ensembles | 98.4 |
+    | 800-epoch FM students, any target | 97.78-98.00 flip |
+
+    No training lever left is resolvable before the deadline. What remains is prediction-time (balancing/kNN,
+    pending the professor) and the choice of the final 2 picks.
+- **11:30 EST: Run I submitted (`h_final800_div`), public 0.900** (ref 57991519). The team has 4 of 5 slots used today,
+  per the user's plan of one today.
+  - Model: 4.62M resnet_c, FM from sam50 + sam50_s2 + aa50 + w40_50, 800 epochs, all 50k, flip TTA.
+  - Checks: 2,000 rows in sample order, 4,623,178 params.
+  - Class counts: airplane 174, automobile 219, frog 180; the same lopsidedness as every model.
+  - It disagrees with H / G / ens3 / 1600 on 71 / 77 / 65 / 70 hidden images.
+  - **Public scores:**
+
+    | Run | Public |
+    |---|---|
+    | F | 0.901 |
+    | G | 0.901 |
+    | I | 0.900 |
+    | H | 0.897 |
+
+    All four sit within one public SE (0.95 pt) of each other, as the twin ties predicted.
+  - The HPC is idle apart from the babysitter. Every `runs/jobs.txt` entry has its `final.pt`.
+- **11:50 EST: the professor approved class-balanced prediction** (the Slack question covered prediction-time class-prior
+  adjustment and assuming about equal images per class). kNN smoothing was not part of the question and stays unused.
+  - Added `--balance` to `src.evaluate`: a second row per model with `balance_probs` decoding on clean val and on every
+    suite set.
+  - Twins, flip TTA (`scratchpad/balance_eval.log`):
+
+    | Twin (final) | val | → balanced | suite mean | → balanced | JPEG 50 | → balanced |
+    |---|---|---|---|---|---|---|
+    | `h_fm800` (H) | 98.00 | 97.92 | 96.49 | 96.67 | 85.32 | 86.70 |
+    | `h_fm800_div` (I) | 97.82 | **97.90** | 96.59 | **96.77** | 86.58 | 88.32 |
+    | `h_fm800_ens3` | 97.80 | 97.84 | 96.61 | **96.77** | 86.62 | 88.06 |
+    | `h_fm1600` | 97.86 | 97.92 | 96.55 | 96.71 | 86.00 | 87.40 |
+    | `h_fm800_sam` | 97.78 | 97.82 | 96.47 | 96.71 | 86.40 | 88.60 |
+    | `r1_fm` (F) | 97.78 | 97.78 | 96.28 | 96.42 | 85.66 | 86.80 |
+    | `r2_twin_S` (G) | 97.58 | 97.56 | 96.23 | 96.30 | 85.38 | 86.66 |
+
+  - Balancing is ±0.08 on clean val (already balanced) and +0.07 to +0.24 on the suite mean. Its gain is largest under
+    JPEG, where predictions skew (+1.1 to +2.2). The 800-epoch FM students gain the most (+0.16 to +0.24).
+  - **Best balanced: `div` (I)**, top on suite mean (tied with ens3) and on clean.
+  - Balanced CSVs: `runs/{h_final800_div,h_final800,h_final800_ens3,h_final1600,h_final800_sam,r2_final_S,r2_final_H}/
+    submission_flip_bal.csv`. They change 61-78 of 2,000 predictions each, and every class lands at 192-206.
+- **The user's decision:** submit the balanced Run I (`runs/h_final800_div/submission_flip_bal.csv`) right after the
+  19:00 EST slot reset, keeping today's last slot free for teammates. It is a clean A/B against Run I (0.900): only the
+  70 balanced predictions differ.

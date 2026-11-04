@@ -244,8 +244,70 @@ The legitimate top of the leaderboard is about 0.914; the #1 entry at 1.000 is n
     - Mixing every batch: +0.31, not better than half the batches.
 42. **Run E (`twin_kdn` submitted directly, 97.50 flip val):** 0.888 public vs D's 0.891. All five team submissions sit
     within the public noise of each other (87.5-89.2, SD 0.7).
-43. **Test-time BN adaptation is allowed** (confirmed by the professor). It is not yet tested. Expected gain is small (0
-    to +0.5) because the hidden set's shift looks semantic, not low-level. Evaluate it offline first.
+43. **Test-time BN adaptation is allowed** (confirmed by the professor), but measured harmful.
+    - The hidden set's BN-input statistics are only mildly shifted in early layers and most shifted in the last
+      (semantic) layers.
+    - On the held-out twin, adapting BN costs about 0.5 on clean val; it helps only for blur/JPEG-type shifts.
+    - Not used.
+
+## 9c. Round 5 (Nov 3 evening): architecture levers under FM, and HPC
+
+44. **More FLOPs per parameter does not help under function matching** (300 epochs, same teacher, vs `r1_fm` 97.66 /
+    97.78 flip):
+    - strides (1,2,1), last stage at 16×16: -0.66 / -0.34, McNemar p = 0.001;
+    - strides (1,1,2), stages 1-2 at 32×32, 3× the FLOPs: -0.30 / -0.20;
+    - squeeze-and-excitation: -0.24 / -0.24.
+
+    All three are also worse on every corruption family. s112 has the lowest val loss but not the best accuracy.
+    Plain resnet_c stays the student.
+45. **Two architectures with FM both score 0.901 public:** Run F (resnet_c, twin 97.78) and Run G (PreAct 4.98M, twin
+    97.58). FM is the lever; architecture is second-order, and the 0.2 gap is below public-LB resolution.
+46. **Patience and teacher strength look like the remaining levers.** At the same fraction of the schedule:
+    - FM at 800 epochs runs +0.29 above the 300-epoch run at 52% of training;
+    - a SAM-trained WRN-28-10 teacher runs +0.19 above `teacher_wrn300` at 31%.
+47. **NYU HPC Cloud Bursting lessons:**
+    - Access is OOD only.
+    - Ship npz arrays, not 52k PNGs (NFS crawls).
+    - Miniconda-latest has Python 3.14, which has no cu118 PyTorch wheel, so use a 3.11 env.
+    - One A100 per run is about 4x faster than Colab's 4-per-GPU packing: 8 s/epoch for an FM student, 22 s/epoch
+      for WRN-28-10 + SAM.
+    - The L4 partition never booted (three CF → requeue cycles).
+    - Interactive Jupyter sessions get preempted. Monitor through the dashboard file viewer instead; the batch jobs are
+      independent of it.
+
+## 9d. Round 6 (Nov 4): the FM student has reached its teacher
+
+48. **One-factor results vs `h_fm800`** (97.84 / 98.00 flip, suite mean 96.49 flip):
+    - pure KD (`--kd-alpha 1.0`): -0.20 / -0.18;
+    - an equal-strength SAM teacher: +0.02 / -0.22, after leading by +0.28 mid-run;
+    - no student noise: 0.00 / -0.10;
+    - **1600 epochs (`h_fm1600`): +0.02 / -0.14, suite mean +0.16 / +0.06, McNemar p = 1.0 / 0.41.** 800 → 1600
+      epochs is a tie, so `h_final1600` is not adopted.
+
+    All four are within the ±0.2 run-to-run noise. Mid-run leads keep vanishing in the low-LR phase, so only a final
+    paired comparison counts.
+49. **`h_fm800` matches its teacher** (98.9% agreement, 98.00 vs `teacher_wrn300` 97.90 flip). Neither more epochs nor
+    the student settings move it. At the time this pointed to the teacher as the binding constraint; takeaway 51
+    disproves that.
+50. **Ensembles of same-recipe models saturate at about 98.16** (2 teachers 98.08; 4 students 98.16; 2 + 2 98.16)
+    because their errors are correlated. The remaining training lever is a **diverse** teacher set (AutoAugment,
+    WRN-40-10).
+51. **Diverse teachers raise the target but not the student.**
+    - Ensembles that include AutoAugment teachers reach 98.38-98.40, against 98.18 for the same-recipe ones. Adding
+      2 more diverse teachers (6 in all) stays at 98.38.
+    - Yet `h_fm800_div` ties `h_fm800`: 97.92 / 97.82 flip, McNemar p 0.71 / 0.32. Its 50k final (Run I) scores 0.900
+      public, against 0.901 for F and G.
+    - Every 800-epoch FM student lands at 97.78-98.00 flip whatever its target. The 4.62M student recipe is the
+      ceiling; the extra correct answers of an ensemble sit at the decision margin and are not inherited.
+    - What remains is prediction-time (class-balanced decoding and kNN smoothing, if the professor allows them) and
+      the choice of the final 2 picks.
+
+52. **Class-balanced decoding is approved by the professor** (Nov 4) and measured on every twin (flip TTA).
+    - It is ±0.08 on clean val, which is already balanced, and +0.07 to +0.24 on the suite mean. JPEG gains +1.1 to
+      +2.2.
+    - It changes 61-78 of 2,000 hidden predictions per model. Every model under-predicts airplane (168-177) and
+      over-predicts automobile (217-221) before balancing.
+    - kNN smoothing was not covered by the approval and is not used.
 
 ## 10. Ideas for the next round (ranked by expected value per compute unit)
 

@@ -6,11 +6,22 @@ provided by the course, under a budget of 5,000,000 trainable parameters, for th
 
 ## Results
 
-| Model | Channels | Blocks | Params | Val acc (5k held out) | Kaggle public |
-|---|---|---|---|---|---|
-| resnet_a | 64-128-256-512 | 2-1-1-1 | 4,977,226 | TBD | TBD |
-| resnet_b | 80-160-320 | 2-2-2 | 4,337,370 | TBD | TBD |
-| resnet_c | 64-128-256 | 3-4-3 | 4,623,178 | TBD | TBD |
+Every submission is in [`submissions/`](submissions/), one folder each (`Abhinav_Run-D` … `Abhinav_Run-I`, plus
+unsubmitted `candidates/`). Each folder has the model (`model.pt`), the submitted CSV, a class-balanced CSV, the logs,
+the 45k twin used to validate it, and the exact training command.
+
+| Run | Recipe (all `resnet_c` 4.62M unless noted, trained from scratch) | Twin val (flip) | Public |
+|---|---|---|---|
+| D | KD from WRN-28-10 + input noise, 300 epochs | 97.50 | 0.891 |
+| E | Run D's 45k twin, submitted directly | 97.50 | 0.888 |
+| F | function-matching KD (MixUp/CutMix) from WRN-28-10, 300 epochs | 97.78 | **0.901** |
+| G | same as F with Vedant's PreAct 4.98M | 97.58 | **0.901** |
+| H | F at 800 epochs (NYU HPC) | 98.00 | 0.897 |
+| I | H with a diverse 4-teacher ensemble (2x WRN-28-10 SAM, WRN-28-10 AutoAugment, WRN-40-10) | 97.82 | 0.900 |
+
+Function matching was the big lever. After it, every change ties within the ±0.2 twin and ±0.95 public-LB noise.
+Class-balanced decoding (`src.predict --balance`, approved by the professor) is the remaining prediction-time lever.
+The full story is in `notes/key_takeaways.md`, and the HPC workflow (Slurm scripts, babysitter) in `scripts/hpc/`.
 
 ## Repository layout
 
@@ -24,6 +35,8 @@ src/predict.py     TTA inference on the evaluation images, writes and validates 
 notebooks/project1.ipynb   end-to-end Colab notebook: data, param counts, training, curves, submission
 scripts/colab.py   runs training on a Colab GPU from a local terminal via the Google Colab CLI
 scripts/submit.sh  predicts locally and submits to Kaggle after a confirmation
+scripts/hpc/       NYU HPC Cloud Bursting: env setup, train.sbatch, the babysitter that resubmits jobs
+submissions/       one folder per Kaggle submission: model.pt, CSVs, logs, 45k twin, README
 ```
 
 ## Reproducing the results

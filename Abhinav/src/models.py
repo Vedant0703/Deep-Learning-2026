@@ -15,22 +15,38 @@ WideResNet is the knowledge-distillation teacher. The teacher is trained from sc
 the rules require. It is never submitted, so the parameter budget does not apply to it. With custom widths the same
 pre-activation layout is also a student (PREACT_CONFIGS), and then the budget applies.
 """
+import math
+
 import torch.nn as nn
 import torch.nn.functional as F
 
 PARAM_BUDGET = 5_000_000
 
 
-class BasicBlock(nn.Module):
-    """Residual block computing ReLU(S(x) + F(x)), with F = conv-BN-ReLU-conv-BN."""
+class SEModule(nn.Module):
+    """Squeeze-and-Excitation (Hu et al., CVPR 2018): rescales each channel by a gate computed from the global
+    average of all channels."""
 
-    def __init__(self, in_ch, out_ch, stride=1, kernel_size=3, skip_kernel_size=1):
+    def __init__(self, ch, reduction=16):
+        super().__init__()
+        self.fc1 = nn.Conv2d(ch, ch // reduction, 1)
+        self.fc2 = nn.Conv2d(ch // reduction, ch, 1)
+
+    def forward(self, x):
+        return x * self.fc2(F.relu(self.fc1(F.adaptive_avg_pool2d(x, 1)))).sigmoid()
+
+
+class BasicBlock(nn.Module):
+    """Residual block computing ReLU(S(x) + F(x)), with F = conv-BN-ReLU-conv-BN (optionally followed by SE)."""
+
+    def __init__(self, in_ch, out_ch, stride=1, kernel_size=3, skip_kernel_size=1, se=False):
         super().__init__()
         pad = kernel_size // 2
         self.conv1 = nn.Conv2d(in_ch, out_ch, kernel_size, stride, pad, bias=False)
         self.bn1 = nn.BatchNorm2d(out_ch)
         self.conv2 = nn.Conv2d(out_ch, out_ch, kernel_size, 1, pad, bias=False)
         self.bn2 = nn.BatchNorm2d(out_ch)
+        self.se = SEModule(out_ch) if se else None
         self.relu = nn.ReLU(inplace=True)
 
         # Projection shortcut only when the shape changes; identity otherwise.
@@ -45,14 +61,20 @@ class BasicBlock(nn.Module):
     def forward(self, x):
         out = self.relu(self.bn1(self.conv1(x)))
         out = self.bn2(self.conv2(out))
+        if self.se is not None:
+            out = self.se(out)
         return self.relu(out + self.shortcut(x))
 
 
 class ResNet(nn.Module):
+    """`strides[i]` is the stride of stage i's first block (default 1, 2, 2, ...: each later stage halves the
+    resolution). A stride of 1 in a later stage keeps more resolution: more compute, same parameters."""
+
     def __init__(self, channels, blocks, kernel_size=3, skip_kernel_size=1, pool_size=None,
-                 num_classes=10, dropout=0.0):
+                 num_classes=10, dropout=0.0, strides=None, se=False):
         super().__init__()
         assert len(channels) == len(blocks), "channels and blocks must have one entry per stage"
+        strides = tuple(strides) if strides else (1,) + (2,) * (len(channels) - 1)
 
         self.stem = nn.Sequential(
             nn.Conv2d(3, channels[0], 3, 1, 1, bias=False),
@@ -60,16 +82,15 @@ class ResNet(nn.Module):
             nn.ReLU(inplace=True),
         )
 
-        # First stage keeps 32x32 resolution; every later stage halves it.
         stages, in_ch = [], channels[0]
         for i, (out_ch, n_blocks) in enumerate(zip(channels, blocks)):
             for j in range(n_blocks):
-                stride = 2 if (i > 0 and j == 0) else 1
-                stages.append(BasicBlock(in_ch, out_ch, stride, kernel_size, skip_kernel_size))
+                stride = strides[i] if j == 0 else 1
+                stages.append(BasicBlock(in_ch, out_ch, stride, kernel_size, skip_kernel_size, se))
                 in_ch = out_ch
         self.layers = nn.Sequential(*stages)
 
-        final_size = 32 // 2 ** (len(channels) - 1)
+        final_size = 32 // math.prod(strides)
         if pool_size is None:
             self.pool = nn.AdaptiveAvgPool2d(1)
             pooled = 1
@@ -149,6 +170,12 @@ CONFIGS = {
     "resnet_b": dict(channels=(80, 160, 320), blocks=(2, 2, 2)),
     # Deeper 3-stage network at ResNet-18 widths.
     "resnet_c": dict(channels=(64, 128, 256), blocks=(3, 4, 3)),
+    # resnet_c keeping 16x16 resolution in the last stage: same parameters, 1.34 vs 0.72 GMACs per image.
+    "resnet_c_hr": dict(channels=(64, 128, 256), blocks=(3, 4, 3), strides=(1, 2, 1)),
+    # resnet_c keeping 32x32 through stage 2 and 16x16 in stage 3: same parameters, 2.21 GMACs per image.
+    "resnet_c_s112": dict(channels=(64, 128, 256), blocks=(3, 4, 3), strides=(1, 1, 2)),
+    # resnet_c with Squeeze-and-Excitation in every block (+35,868 parameters).
+    "resnet_c_se": dict(channels=(64, 128, 256), blocks=(3, 4, 3), se=True),
 }
 
 
@@ -161,6 +188,7 @@ PREACT_CONFIGS = {
 # Distillation teachers (exempt from the budget, never submitted).
 TEACHER_CONFIGS = {
     "wrn28_10": dict(depth=28, widen=10),  # 36.5M params
+    "wrn40_10": dict(depth=40, widen=10),  # 55.8M params; a deeper teacher for a more diverse ensemble
 }
 
 
