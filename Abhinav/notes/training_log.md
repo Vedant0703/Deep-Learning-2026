@@ -2030,3 +2030,84 @@ images; augmentations of them are allowed; no external data or weights; no evalu
     (M, L, G).
   - Run G's twin is the most decorrelated from M's twin on held-out errors (Jaccard 0.52): the best hedge candidate.
   - The PDF (v3) is corrected to say so.
+- **14:50 EST HPC:**
+  - The babysitter now runs inside OOD Jupyter 24126 (`interactive` partition, b-9-10): `nohup bash
+    scripts/hpc/babysit.sbatch &`. As a batch job it kept failing with "user env retrieval fail" (24144, 23737) or
+    on CPU spot nodes.
+  - A 12 h `interactive` Jupyter (b-9-21) is starting for the handover.
+  - `h_final800_haug` (23779) had been "CANCELLED by 0" at 19:00 UTC before starting; resubmitted with the 6 Round 10
+    jobs (24137-24143).
+- **15:00 EST, A100 availability check** (the user asked to use other GPUs or CPU rather than wait):
+  - `sbatch --test-only` estimates a new `c12m85-a100-1` job would start at 21:41 UTC (our queued jobs are ahead of
+    that).
+  - `c24m170-a100-2`, `a100-4-std` and `g2-standard-24` give "Unspecified error" (not allowed for our account).
+  - `g2-standard-12` (1x L4) works with `--cpus-per-task=10 --mem=40GB` (start estimate 20:16 UTC).
+  - **Insurance:** `h_fm600_pre_haug_l4` / `h_final600_pre_haug_l4` (24154/24155) on L4. Rule: for each run, the
+    copy that starts training first is kept and the other cancelled, so we never choose between copies by score.
+  - **CPU is not viable for training:** about 23 GFLOPs per image (4 WRN teachers dominate) × 45k images is about
+    1 PFLOP per epoch, so 35-60 h for 600 epochs even on a 192-vCPU node. CPU (the Mac) is used for evaluation and
+    prediction.
+- **15:20 EST:**
+  - The L4 insurance jobs (24154/24155) sat in CF for about 7 min, then went back to the queue (requeued): the L4
+    pool still fails to boot, as on Nov 3.
+  - Both `interactive` Jupyter sessions (24126 with the babysitter, 24147) ended after about 30 min, like every
+    CPU node today, while the A100 jobs run for hours undisturbed.
+  - Monitoring now uses the OOD Active Jobs page and the Files API. Resubmission needs a fresh Jupyter (5-15 min to
+    start).
+  - Our 7 A100 jobs are queued (Priority). The test-only start estimate for a new A100 job is 21:41 UTC.
+  - Running: `h_fm800_haug`, `h_fm600_haug5`, `h_final600_haug5` (about 1h20m in; done about 17:00-18:00 EST).
+- **15:40 EST: scale-aware TTA fails the pre-registered rule; dropped.**
+
+  | Twin | fs+bal clean / suite | fs-scale+bal clean / suite | Δ clean | Δ suite |
+  |---|---|---|---|---|
+  | M (`h_fm600_haug`) | 97.96 / 96.88 | 98.00 / 97.01 | +0.04 | +0.13 |
+  | L (`c_ft100_haug`) | 97.86 / 96.74 | 97.84 / 96.84 | −0.02 | +0.10 |
+
+  - The rule needed clean ≥ +0.04 *and* suite ≥ +0.05 on both twins. L fails on clean, so fs+bal stays the decoding
+    for every model (no per-model choice).
+  - The suite gain is consistent (+0.1) but small; the hard suite does not move (M 93.59 vs 93.68).
+  - The remaining fss evaluations (Run I, PreAct-600, Run G twins) were stopped to free the Mac.
+- **16:45 EST, Round 11** (plan in `~/.claude/plans/the-high-level-goal-rosy-star.md`; the user: "don't disrupt the queue,
+  add to the pipeline, maybe start on Colab"):
+  - **Push-back recorded:**
+    - an M + PreAct ensemble is not a legal submission (9.6M params, single model only), and the 2 final picks are a
+      hedge, not an ensemble;
+    - "M with 4.8M params" is low value: capacity isn't binding (every 4.3-5.0M student ties under FM; the student
+      matches its teacher).
+  - **A. Model soup** (`scripts/soup.py`, new): a uniform average of M + 4 hard-aug fine-tunes of M (`s_tw_a-d` from
+    M's twin, `s_fn_a-d` from M's final; p 0.3 / 0.5 / 6 factors / wide; seeds 1-4), with BN recalibrated on 50
+    training batches.
+    - Checks: soup(M, M) == M exactly.
+    - A soup of models from *different* starts (M + L's twin) scores 54%: soups need a shared start, which is why
+      M and PreAct can't be averaged.
+  - **B. Hard-view distillation** (`--hard-teacher`, `--hard-teacher-weight 0.5`; `src/train.py` aac624a243205cef on
+    the HPC):
+    - on hard-augmented images, the KD target mixes the teachers' clean-view answer with M's hard-view answer;
+    - `h_fm600_hvd` / `h_final600_hvd`;
+    - with weight 0 the loss is bit-identical to the run without it (the robust model is built inside `fork_rng`).
+  - **C. Run G + L's recipe:** `h_ftG100_haug_tw` / `h_ftG100_haug` (preact_v, `--init` Run G's twin / final, 100 ep,
+    lr 0.02, hard aug, 4 teachers). Run G's weights reached the HPC via `curl` from the public GitHub repo; SHA-256
+    matches.
+  - **C′ on Colab L4** (`c_ftG100_1t_tw` / `c_ftG100_1t`): C with Run G's own single teacher (`teacher_wrn300` /
+    `teacher50`).
+    - Both packed on one L4: 63-69 s/epoch, so about 1.9 h, about 3.8 of the 3.99 units.
+    - `follow` backs up `last.pt` every 10 min in case the units run out.
+- **16:40 EST: all 7 Round 10 jobs had been "CANCELLED by 0"** (20:56-21:10 UTC: nodes allocated, 14 min of boot, then
+  cancelled), the L4 copies too; with no babysitter alive, nothing resubmitted them.
+  - **Fix: the babysitter now runs inside the GPU jobs.**
+    - `train.sbatch` (3cbb5af35074590c) starts a background loop that runs one pass of `babysit.sbatch`
+      (`BABYSIT_ONCE=1`, e465dcd4dd1f67aa) every 5 min.
+    - One host at a time: `runs/babysit/host` holds its job ID, and a host silent for 10 min is taken over.
+    - The attempt cap is now 20 (was 8). `h_final600_t1`'s count was set to 99 so the old dropped run stays dead.
+  - 21:40 UTC: one pass submitted all 19 missing jobs in queue-file order (Round 10's 7, then Round 11's 12:
+    24302-24320). The same host loop runs in Jupyter 24297 until a GPU job takes over.
+- **17:15 EST: `h_fm600_haug5` (p = 0.5) twin: a tie with M, not an improvement.**
+
+  | Twin (fs+bal) | Clean | Suite | Hard mean (fs) | lowres16 | zoom_out | bg | McNemar vs M | Jaccard with M |
+  |---|---|---|---|---|---|---|---|---|
+  | M `h_fm600_haug` (p 0.3) | 97.96 | 96.88 | 93.68 | 94.74 | 96.24 | 95.58 | – | – |
+  | `h_fm600_haug5` (p 0.5) | 97.84 | 96.81 | 93.77 | 95.20 | 96.38 | 95.66 | 23 vs 27, p = 0.67 | 0.60 |
+
+  - Train log: final val 97.76, flip 97.86 (M: 97.80 / 97.94).
+  - A stronger p buys +0.1 on the hard suite and costs about 0.1 clean. It misses the clean bar (97.86) by 0.02, so
+    under rule D it doesn't qualify. p = 0.3 is about right.

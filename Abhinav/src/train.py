@@ -76,6 +76,12 @@ def get_args(argv=None):
     p.add_argument("--hard-factors", nargs="+", default=list(BATCH_FACTORS), choices=ALL_BATCH_FACTORS)
     p.add_argument("--hard-levels", default="default", choices=sorted(HARD_LEVELS),
                    help="level ranges for --hard-aug (src.hard.HARD_LEVELS); 'wide' reaches smaller, blurrier objects")
+    p.add_argument("--hard-teacher", default=None,
+                   help="final.pt of a model trained with --hard-aug (e.g. Run M); on hard-augmented images the "
+                        "distillation target mixes the teachers' answer for the clean image with this model's answer "
+                        "for the hard image (hard-view distillation)")
+    p.add_argument("--hard-teacher-weight", type=float, default=0.5,
+                   help="share of --hard-teacher in that mixture (0 = the plain clean-image target)")
     p.add_argument("--hard-label-weight", type=float, default=None,
                    help="weight of the true-label loss on hard-augmented images (the rest is distillation); "
                         "default: the same 1 - kd_alpha as other images")
@@ -228,7 +234,7 @@ def add_pixel_noise(x, max_std, p=0.5):
 def train_one_epoch(model, loader, criterion, optimizer, scheduler, scaler, device, use_amp, mixer, mix_prob,
                     ema=None, teacher=None, kd_alpha=0.0, kd_temp=1.0, student_noise=0.0,
                     kd_loss=distillation_loss, sam_rho=0.0, hard_aug=0.0, hard_factors=BATCH_FACTORS,
-                    hard_label_weight=None, hard_levels="default"):
+                    hard_label_weight=None, hard_levels="default", hard_teacher=None, hard_teacher_weight=0.5):
     model.train()
     params = [p for p in model.parameters() if p.requires_grad]
     loss_sum = torch.zeros((), device=device)
@@ -254,6 +260,17 @@ def train_one_epoch(model, loader, criterion, optimizer, scheduler, scaler, devi
             xs, hard = hard_batch(xs, hard_aug, hard_factors, CIFAR10_MEAN, CIFAR10_STD, hard_levels)
             if device.type == "cuda":
                 xs = xs.contiguous(memory_format=torch.channels_last)
+            if hard_teacher is not None and teacher_out is not None and hard.any():
+                # Hard-view distillation: mix (in probability space) the teachers' clean-image answer with the
+                # robust model's answer for the hard image it actually sees.
+                with torch.no_grad(), torch.autocast(device.type, dtype=torch.float16, enabled=use_amp):
+                    rob = hard_teacher(xs[hard], kd_temp).float()
+                w = hard_teacher_weight
+                mixed = kd_temp * torch.logaddexp(teacher_out[hard].float() / kd_temp + math.log(1 - w),
+                                                  rob / kd_temp + math.log(w)) if 0 < w < 1 else (
+                    rob if w >= 1 else teacher_out[hard].float())
+                teacher_out = teacher_out.float().clone()
+                teacher_out[hard] = mixed
         per_image = teacher_out is not None and hard is not None and hard_label_weight is not None
 
         def forward_loss():
@@ -404,6 +421,14 @@ def main(argv=None):
         _, teacher_acc = evaluate(teacher, val_loader, device, use_amp) if val_loader else (None, None)
         print(f"Teacher {' + '.join(args.teacher)}: {count_params(teacher):,} params"
               + (f" | val acc {teacher_acc:.2f}" if val_loader else ""))
+    hard_teacher = None
+    if args.hard_teacher:
+        assert teacher is not None and args.hard_aug > 0, "--hard-teacher needs --teacher and --hard-aug"
+        with torch.random.fork_rng(devices=[]):  # building it must not shift the run's random stream
+            hard_teacher = TeacherEnsemble([load_model(args.hard_teacher, device)])
+        if device.type == "cuda":
+            hard_teacher = hard_teacher.to(memory_format=torch.channels_last)
+        print(f"Hard-view teacher {args.hard_teacher} (weight {args.hard_teacher_weight})")
     criterion = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing)
     optimizer = make_optimizer(raw_model, args)
     scheduler = make_scheduler(optimizer, len(train_loader), args)
@@ -453,7 +478,8 @@ def main(argv=None):
                                                 scaler, device, use_amp, mixer, mix_prob,
                                                 ema, teacher, args.kd_alpha, args.kd_temp, args.student_noise,
                                                 kd_loss, args.sam_rho, args.hard_aug, args.hard_factors,
-                                                args.hard_label_weight, args.hard_levels)
+                                                args.hard_label_weight, args.hard_levels, hard_teacher,
+                                                args.hard_teacher_weight)
         val_loss, val_acc = evaluate(eval_model, val_loader, device, use_amp) if val_loader else (None, None)
         dt = time.time() - t0
         history.append(dict(epoch=epoch + 1, lr=lr, train_loss=train_loss, train_acc=train_acc,

@@ -25,7 +25,24 @@ ARGS=$(printf '%q ' "$@")
 cd "$PROJ"
 mkdir -p "runs/$SLURM_JOB_NAME"
 echo "$(date) job $SLURM_JOB_ID on $(hostname): $ARGS" >> "runs/$SLURM_JOB_NAME/slurm_jobs.txt"
+# Host the queue babysitter here (one pass of scripts/hpc/babysit.sbatch every 5 min): CPU nodes get reclaimed after
+# about 30 min, GPU jobs run for hours. One host acts at a time: runs/babysit/host holds its job ID, and a host that
+# has not passed for 10 min is taken over.
+(
+    set +e
+    while true; do
+        h=runs/babysit/host
+        if [ ! -f "$h" ] || [ "$(cat "$h")" = "$SLURM_JOB_ID" ] || [ $(( $(date +%s) - $(stat -c %Y "$h") )) -gt 600 ]; then
+            echo "$SLURM_JOB_ID" > "$h"
+            sleep 2
+            [ "$(cat "$h")" = "$SLURM_JOB_ID" ] && BABYSIT_ONCE=1 bash scripts/hpc/babysit.sbatch >> runs/babysit/hosted.log 2>&1
+        fi
+        sleep 300
+    done
+) &
+BABYSIT_PID=$!
 singularity exec --nv --overlay "$ENV/overlay.ext3:ro" "$ENV/image.sif" /bin/bash -c \
     "source /ext3/env.sh && cd '$PROJ' && python -u -m src.train --out 'runs/$SLURM_JOB_NAME' --resume \
      --num-workers $((SLURM_CPUS_PER_TASK - 1)) $ARGS >> 'runs/$SLURM_JOB_NAME/train.log' 2>&1; \
      echo \$? > 'runs/$SLURM_JOB_NAME/exit_code'"
+kill "$BABYSIT_PID" 2>/dev/null || true
