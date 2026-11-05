@@ -30,3 +30,7 @@ Takeaways:
 - Round 8 (one change at a time to Run I's recipe: mixing off at the end, DIST loss, KD temperature 1) all tie or lose on the twin.
 - Round 9: on-the-fly hard-factor augmentation (`--hard-aug 0.3 --hard-label-weight 0.5`, `src/hard.py`) tied Run I's twin on clean val and lifted a hard-factor suite (low resolution, scale, background) from 88.4 to 93.7. On Kaggle it gave the best scores: Run M 0.910 (from scratch, 600 epochs) and Run L 0.906 (fine-tune of Run I). A fixed set of 2,000 pre-made hard images did nothing.
 - Details: `../notes/key_takeaways.md` (distilled) and `../notes/training_log.md` (full log).
+
+## Dhanush Run G TTA follow-up
+
+[Dhanush_Run-G-TTA](Dhanush_Run-G-TTA/): **0.90400 public**, same Run G weights, 10-view translation/flip probability TTA without balancing; twin clean validation 97.76%.
