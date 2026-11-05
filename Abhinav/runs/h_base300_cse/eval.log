@@ -1,0 +1,5 @@
+model                              tta           val   mean  worst |  bright+  bright-   contr+   contr-   sat0.5   sat1.5    sharp     blur noise.02 noise.04   jpeg50
+runs/h_base300_cse/final.pt        flip        96.62  94.95  84.86 |    96.16    96.58    96.32    96.38    96.10    96.52    95.50    95.44    95.96    94.68    84.86
+  + balanced T=1                   flip        96.64  95.05  85.70 |    96.18    96.58    96.38    96.46    96.16    96.46    95.60    95.42    95.98    94.64    85.70
+  hard suite                       flip               84.10  65.30 | lowres16=65.30 lowres24=90.80 zoom_in1.3=90.46 zoom_out0.7=86.54 rot20=90.38 persp0.4=93.14 bg0.7=79.86 confuse0.7=88.38 ambiguous=72.00
+  hard suite + balanced T=1        flip               84.96  69.00 | lowres16=71.42 lowres24=91.02 zoom_in1.3=91.20 zoom_out0.7=88.94 rot20=90.98 persp0.4=93.24 bg0.7=80.18 confuse0.7=88.70 ambiguous=69.00

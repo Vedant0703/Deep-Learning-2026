@@ -1769,3 +1769,201 @@ toward 98.3-98.6.
   - On the public 1,000, decoding moved I by +2 images and H by −3, net −1 over the pair. Each changes about 80 of
     2,000 predictions, so about 40 public ones. That is within noise; the public set can't tell whether balancing
     helps.
+- **02:40 EST GitHub:** `abhinav` commit 5c5f117 adds `Abhinav/submissions/Abhinav_Run-J`, `Abhinav_Run-K` and
+  `candidates/{Abhinav_mixoff-600,Abhinav_dist-600,Abhinav_preact-600}`. It also has the Round 8 logs, the updated
+  `src/predict.py` / `src/evaluate.py`, these notes and the README results table.
+
+## Round 9 (Nov 5): baseline architecture study, and a hard-factor set built from our own images
+Plan: `~/.claude/plans/the-high-level-goal-rosy-star.md`. Data rules (course): train only on the permitted training
+images; augmentations of them are allowed; no external data or weights; no evaluation labels; reproducible.
+- **03:07 EST: 9 baseline/KD jobs queued** (`runs/jobs.txt`, local copy `scripts/hpc/jobs_round9.txt`).
+  - Seven architectures with no teacher at 300 epochs, `@C`: `h_base300_{c,pre,a,b,cse,chr,cs112}`.
+  - Plus KD for the two without one: `h_kd300_{a,b}`, with `teacher_wrn300` as `r1_fm` / `p1_*` / `r2_twin_S`.
+- **GPU usage:** 96.6 GPU-hours since Nov 1 (`sacct`). The account limit is `gres/gpu=18000` minutes (300 h).
+- **`src/hard.py` (new):** factors made from our own labelled images, each keeping its source label:
+  - `lowres` (down to 12-24 px and back);
+  - `zoom_in` (1.2-1.5×);
+  - `zoom_out` (0.6-0.85×, edge-replicate pad; reflect padding mirrored a second object into the frame);
+  - `rotate` (15-30°);
+  - `perspective` (0.3-0.5);
+  - `background` (shrunk into the centre of another image);
+  - `confuse` (a 0.65-0.8 blend with a confusable class, keeping the majority label).
+  - **`src.evaluate --hard-suite`** runs each factor at one level on the 5k held-out images. It adds `ambiguous`:
+    the 500 held-out images `teacher_wrn300` is least sure of.
+  - **`--confusion`** prints the top mistakes per row.
+- **03:15 EST: hard-suite diagnosis (flip TTA, twins):**
+
+  | Model | Clean | lowres16 | lowres24 | zoom_in1.3 | zoom_out0.7 | rot20 | persp0.4 | bg0.7 | confuse0.7 | ambiguous | Mean |
+  |---|---|---|---|---|---|---|---|---|---|---|---|
+  | `h_fm800_div` (Run I) | 97.82 | 80.80 | 94.88 | 93.32 | 86.22 | 93.68 | 95.34 | 80.46 | 90.70 | 80.20 | 88.40 |
+  | `h_fm800` (Run H) | 98.00 | 80.88 | 94.82 | 93.66 | 83.92 | 93.42 | 95.36 | 79.36 | 90.64 | 82.40 | 88.27 |
+  | `h_fm600_t1` | 97.90 | 82.24 | 94.88 | 93.66 | 86.06 | 93.48 | 95.32 | 80.60 | 90.92 | 81.20 | 88.71 |
+  | `r1_fm` (F, 300 ep) | 97.78 | 75.56 | 93.82 | 92.72 | 83.52 | 93.20 | 94.72 | 78.54 | 89.96 | 80.00 | 86.89 |
+  | `r2_twin_S` (G, PreAct) | 97.58 | 77.58 | 93.58 | 92.80 | 85.72 | 92.84 | 94.94 | 79.26 | 90.12 | 78.00 | 87.20 |
+  | `base_c` (no KD, 200 ep) | 97.00 | 69.68 | 92.10 | 90.32 | 81.26 | 90.60 | 93.66 | 75.76 | 88.12 | 74.20 | 83.97 |
+
+  - **The big drops:**
+    - background clutter (−17);
+    - low resolution at 16 px (−17);
+    - zoom-out (−12);
+    - zoom-in (−4.5).
+    Rotation (−4) and perspective (−2.5) are already handled by TrivialAugment.
+  - **Systematic errors:**
+    - a shrunk object becomes "cat" (zoom-out: frog→cat 188, dog→cat 106, deer→cat 103 for Run I);
+    - clutter makes ships and planes "truck" (ship→truck 67, airplane→truck 47);
+    - low resolution turns dogs and cats into "bird" (dog→bird 119, cat→bird 86);
+    - everywhere else the dominant error is cat↔dog.
+  - KD helps on every factor (+2.9 mean, `r1_fm` vs `base_c`), and longer FM adds about +1.5 more.
+- **03:22 EST: hard training set and fine-tunes queued.**
+  - **The set:** `scripts/make_hard.py --factors lowres zoom_in zoom_out background` writes
+    `data/cache/hard_train2k.npz`.
+    - 2,000 images, 200 per class, from the 45k side, 1-2 factors each.
+    - Local MD5 `798495a0951cd17e1dcedd586dcca57c`. It is rebuilt on the HPC by an inbox script.
+  - **The jobs** (100 epochs, lr 0.02, warmup 1, `div` teachers, extra set repeated 3×):
+    - `h_ft100_hard` (twin, init `h_fm800_div`);
+    - `h_ft100_ctrl` (the same, without the extra set);
+    - `h_ftfinal100_hard` (final, init `h_final800_div`);
+    - from scratch at 600 epochs: `h_fm600_hard` / `h_final600_hard`.
+  - The baseline jobs get `Nice=1000`, so the fine-tunes run first.
+  - **New flags in `src/train.py`:** `--extra-train/--extra-repeat` (with an assert that no source image is from the
+    held-out split) and `--init` (our own `final.pt`).
+- **03:45 EST: Round 9b/9c in flight, split between HPC and Colab** (the user asked for both, for speed).
+  - **The user's follow-ups:**
+    - Will fixing these weak spots raise the overall score? Only by the share of hidden images that look like them:
+      0 to +0.5 expected, up to about +1 if the overlap is large.
+    - Use augmentation, not only a fixed set.
+    - Use the true labels on augmented images.
+  - **`--hard-aug P --hard-factors ... --hard-label-weight W`** (`src/train.py`, `src/hard.py hard_batch`).
+    - A fraction P of each batch gets one random factor on the GPU, *after* the teacher has seen the clean image.
+    - Those images get W true-label weight (0.5 vs the usual 0.1), via per-image CE + KL.
+    - Unchanged images stay bit-identical. The per-image KL mean equals the batchmean loss (checked).
+  - **HPC:**
+    - `h_ftfinal100_haug` (the final with on-the-fly aug) is queued.
+    - `h_ft100_hard`, `h_ft100_ctrl`, `h_ftfinal100_hard` and `h_fm600_hard` / `h_final600_hard` are pending.
+    - The baselines got nodes at 03:30: a, b, pre, `kd_a` and c are running.
+    - Users can neither change Nice nor hold their own jobs here ("Unspecified error"), so the queue runs in
+      submission order.
+    - The HPC build of `hard_train2k.npz` matches the local MD5 (`798495a0951cd17e1dcedd586dcca57c`).
+  - **Colab (A100, 9.28 units):** `c_ft100_haug` (the twin with on-the-fly aug, `div` 45k teachers, init
+    `h_fm800_div`).
+    - The teachers are uploaded in parallel; uploading 18.6 MB took 68 s.
+    - **zsh lesson again:** an unquoted `$T` holding 4 paths went to `put` as a single path (takeaway 35).
+- **04:20 EST: architecture baselines (no teacher, 300 epochs, `@C`, flip TTA; balanced in brackets):**
+
+  | Arch | Params | Baseline none / flip (suite) | + KD (teacher_wrn300, FM) none / flip (suite) | KD gain (flip) | Hard mean, base → KD |
+  |---|---|---|---|---|---|
+  | resnet_c | 4.62M | 96.74 / 97.12 (95.73) | `r1_fm` 97.66 / 97.78 (96.28) | +0.66 | 84.1 → 86.9 |
+  | preact_v | 4.98M | 96.78 / 97.26 (95.78) | `r2_twin_S` 97.40 / 97.58 (96.23) | +0.32 | 85.0 → 87.2 |
+  | resnet_b | 4.34M | 96.94 / 97.22 (95.68) | `h_kd300_b` pending | | 83.3 → |
+  | resnet_a | 4.98M | 95.84 / 96.20 (94.67) | `h_kd300_a` 96.80 / 96.88 (95.58) | +0.68 | 80.3 → 84.3 |
+
+  - **Baseline ranking:** preact_v ≈ resnet_b ≈ resnet_c (97.1-97.3 flip, within noise), with resnet_a clearly last
+    (one block per deep stage).
+  - **With KD, resnet_c gains most and is best (97.78).** The PreAct baseline leads, but it gains only +0.32 from KD.
+  - Still pending: `h_kd300_b`, `h_base300_{cse,chr,cs112}`.
+- **04:45 EST: `c_ft100_haug` (Colab A100) works on the hard factors and ties on clean images.**
+  - The run: Run I's twin fine-tuned for 100 epochs at lr 0.02 with `--hard-aug 0.3 --hard-label-weight 0.5`,
+    `div` 45k teachers. It took 31 min at 18.7 s/epoch; the VM stopped with 4.35 units left.
+
+  | Twin | val none / flip | fs + bal (clean / suite) | Hard mean (fs) | lowres16 | zoom_in | zoom_out | bg | rot | persp | confuse |
+  |---|---|---|---|---|---|---|---|---|---|---|
+  | `h_fm800_div` | 97.92 / 97.82 | 97.96 / 96.88 | 88.40 (flip) | 80.80 | 93.32 | 86.22 | 80.46 | 93.68 | 95.34 | 90.70 |
+  | `c_ft100_haug` | 97.62 / 97.70 | 97.86 / 96.74 | **93.07** | **94.06** | **96.30** | **95.52** | **94.68** | 94.04 | 95.78 | 90.94 |
+
+  - **McNemar vs `div`:** flip 30 vs 36, p = 0.54; fs 18 vs 27, p = 0.23. A tie on clean images.
+  - The targeted factors gain +3 to +14. Rotation, perspective and confusable blends (not trained) are unchanged.
+  - Against the rule: clean 97.86 (= the line); suite 96.74 (0.04 under the 96.78 line). The control
+    `h_ft100_ctrl` (HPC, running) shows whether the small clean / suite dip comes from fine-tuning itself.
+  - Balancing hurts the "ambiguous" row only because that row is a class-unbalanced subset (its balanced number is
+    not meaningful).
+- **05:20 EST: the control and fixed-set twins settle it: on-the-fly augmentation works, the fixed set does not.**
+
+  | Twin (fs + bal) | Clean | Suite | Hard mean (fs) | lowres16 | zoom_out | bg | McNemar vs `div` (fs) |
+  |---|---|---|---|---|---|---|---|
+  | `h_fm800_div` (Run I) | 97.96 | 96.88 | 88.40 (flip) | 80.80 | 86.22 | 80.46 | – |
+  | `h_ft100_ctrl` (fine-tune, nothing added) | 97.62 | 96.65 | 88.12 | 78.86 | 86.58 | 82.70 | 12 vs 26, **p = 0.03** |
+  | `h_ft100_hard` (fixed 2k set ×3) | 97.80 | 96.75 | 88.04 | 76.78 | 85.94 | 82.08 | 8 vs 13, p = 0.38 |
+  | `c_ft100_haug` (on-the-fly, teacher clean, label 0.5) | 97.86 | 96.74 | **93.07** | **94.06** | **95.52** | **94.68** | 18 vs 27, p = 0.23 |
+
+  - Fine-tuning alone costs about 0.3 clean (p = 0.03), so 100 more epochs at lr 0.02 is slightly harmful.
+  - **On-the-fly augmentation vs the control:** +0.24 clean, +0.09 suite, +5 on the hard suite. It is a tie with
+    Run I's twin on clean images.
+  - **The fixed set changed nothing on the hard factors.** Its images pass through crop / TrivialAugment / MixUp, and
+    the teacher labels the hard version, so the student learns the teacher's (weak) answers there.
+  - **Decision:** the fixed-set final and from-scratch jobs are cancelled. The from-scratch pair is now
+    `h_fm600_haug` / `h_final600_haug` (`div` recipe, 600 epochs, `--hard-aug 0.3 --hard-label-weight 0.5`).
+  - **Candidate for today's submission:** `runs/h_ftfinal100_haug/submission_fs_bal.csv`. Balancing changed 60
+    predictions; 196-205 per class; it differs from Run J on 51 hidden images.
+- **11:30 EST: the from-scratch hard-aug pair finished (HPC, 600 epochs, about 19-20 s/epoch, 3.3 h each).**
+  - Train log: `h_fm600_haug` final val 97.80 (flip 97.94), best 97.84. `h_final600_haug` trained on all 50k.
+  - Twin evaluation (`src.evaluate --tta flip flip_shift --balance --hard-suite --baseline runs/h_fm800_div/final.pt`):
+
+  | Twin | flip | flip + bal | fs | fs + bal (clean / suite) | Hard mean (flip) | lowres16 | zoom_out | bg | zoom_in | McNemar vs `div` (flip) |
+  |---|---|---|---|---|---|---|---|---|---|---|
+  | `h_fm800_div` (Run I, 800 ep) | 97.82 | 97.90 | – | 97.96 / 96.88 | 88.40 | 80.80 | 86.22 | 80.46 | 93.32 | – |
+  | `c_ft100_haug` (fine-tune) | 97.70 | 97.74 | – | 97.86 / 96.74 | 93.02 | 93.98 | 95.50 | 94.68 | 96.50 | 30 vs 36 |
+  | **`h_fm600_haug` (from scratch, 600 ep)** | **97.94** | **98.06** | **98.00** | **97.96 / 96.88** | **93.58** | **94.62** | **96.20** | **95.66** | **96.74** | 33 vs 27, p = 0.52 |
+
+  - **It passes every part of the rule:** clean 97.96 (≥ 97.86), suite 96.88 (≥ 96.78), the targeted factors
+    +3.4 to +14 over `div`, and above the fine-tune on all of them.
+  - It is the first change since Round 6 that ties the best clean / suite numbers *and* adds something measurable
+    (hard mean +5.2). With 200 fewer epochs.
+  - **Final:** `runs/h_final600_haug/submission_fs_bal.csv` (balancing changed 70; 197-206 per class). It differs
+    from Run J on 69 hidden images and from the fine-tune (`h_ftfinal100_haug`) on 68.
+- **11:38 EST: Round 9e added to the HPC queue file for Nov 6:** `h_fm800_haug` / `h_final800_haug` (Run I's full 800 epochs
+  + hard aug 0.3) and `h_fm600_haug5` / `h_final600_haug5` (p = 0.5). Teachers and everything else unchanged.
+- Also finished: `h_fm600_pre` (PreAct twin, for the `h_final600_pre` final), `h_kd300_b`, `h_base300_cse`,
+  `h_base300_cs112`. Evaluating.
+  - Flip_shift rows for `h_fm600_haug`: hard mean 93.68; McNemar vs `div` 28 vs 24, p = 0.68.
+- **11:40 EST: the HPC babysitter is down.** It was preempted at 15:21 UTC (the 4th time today, about every 40-50
+  min) and resubmitted itself (23548), but that job never ran. So Round 9e was not submitted.
+  - Restarting it via an OOD Jupyter session on `n2c48m24` (23692, queued 16:41 UTC), then
+    `sbatch scripts/hpc/babysit.sbatch` from its terminal.
+  - The A100 partition has about 200 queued jobs from another user, so the 9e runs may wait for nodes.
+- **11:50 EST: the baseline study is complete** (300 epochs, `@C`, flip TTA, suite in brackets; KD = FM from
+  `teacher_wrn300`):
+
+  | Arch | Params | Baseline flip (suite) | + KD flip (suite) | KD gain | Hard mean (flip), base → KD |
+  |---|---|---|---|---|---|
+  | **resnet_c** | 4.62M | 97.12 (95.73) | **97.78** (96.28) `r1_fm` | +0.66 | 84.1 → 86.9 |
+  | preact_v | 4.98M | **97.26** (95.78) | 97.58 (96.23) `r2_twin_S` | +0.32 | 85.0 → 87.2 |
+  | resnet_b | 4.34M | 97.22 (95.68) | 97.58 (96.17) `h_kd300_b` | +0.36 | 83.3 → 86.4 |
+  | resnet_c_s112 | 4.62M | 97.12 (95.32) | 97.58 `p1_s112` | +0.46 | 81.9 → – |
+  | resnet_c_se | 4.65M | 96.62 (94.95) | 97.54 `p1_se` | +0.92 | 84.1 → – |
+  | resnet_c_hr | 4.62M | 96.70 (95.10) | 97.44 `p1_hr` | +0.74 | 81.9 → – |
+  | resnet_a | 4.98M | 96.20 (94.67) | 96.88 (95.58) `h_kd300_a` | +0.68 | 80.3 → 84.3 |
+
+  - **Every architecture gains +0.3 to +0.9 from distillation; resnet_c ends best by 0.2** (about 10 images; the
+    next three tie at 97.58). The follow-up rule (another architecture ≥ 0.15 above `r1_fm` with KD) is not met, so
+    resnet_c stays.
+  - The baseline ranking does not predict the KD ranking: preact_v / resnet_b lead without a teacher but gain least.
+  - KD also lifts the hard suite by 2.5-4 points without any hard augmentation (low-res and background most).
+- **PreAct twin `h_fm600_pre`** (the check for the `h_final600_pre` final): fs + bal 97.94 / 96.74, hard mean 88.3
+  (flip_shift); McNemar vs `div` 22 vs 24, p = 0.88. A tie on clean images, slightly lower suite, no hard gain.
+  It is a decorrelated hedge only (`runs/h_final600_pre/submission_fs_bal.csv`); hard aug is the better candidate.
+- **12:45 EST: cloud instability.** The 4 Round 9e jobs (23703-23706) sat in CF (node boot) for about 12 min, then
+  ended without starting: the nodes failed to boot. The babysitter 23702 was preempted at 17:21 UTC after 30 min
+  (resubmitted as 23737, queued), and the Jupyter session 23692 was preempted too.
+  - Counts are at 1/8, so the babysitter resubmits all four when it next runs.
+- **13:00 EST: resubmitted from a new Jupyter session (23765, b-10-119).**
+  - sacct: 23703-23706 were "CANCELLED by 0" after 12-13 min in CF (cloud node boot failure).
+  - The babysitter's own resubmit 23737 was stuck pending with "user env retrieval fail", so it would never start.
+    It was cancelled and replaced by 23782.
+  - The 4 Round 9e jobs are back in the queue as 23778-23781 (attempt 2/8). The A100 partition has 84 queued and 14
+    running, and `n2c48m24` 77 queued and 5 running, so expect waits.
+- **13:12 EST: submitted Runs M and L (the user confirmed; team count 2 of 5 before).**
+
+  | Run | Model | Decoding | Twin fs + bal (clean / suite) | Hard mean | Expected | **Public** |
+  |---|---|---|---|---|---|---|
+  | J (before) | Run I's model | fs + bal | 97.96 / 96.88 | 88.4 | – | 0.902 |
+  | **M** | `h_final600_haug` (from scratch, hard aug, 600 ep) | fs + bal | 97.96 / 96.88 | 93.6 | ≈ 0.904 (0.898-0.910) | **0.910** |
+  | L | `h_ftfinal100_haug` (Run I + 100-ep hard-aug fine-tune) | fs + bal | 97.86 / 96.74 | 93.0 | ≈ 0.903 (0.897-0.909) | **0.906** |
+
+  - **M is the team's best: 0.910, +0.8 over J** (+8 of the 1,000 public images). It differs from J on 69 hidden
+    images, about 35 of them in the public half, and gets about 8 more of those right than J does. L is +0.4.
+  - Both hard-aug models beat J, and the from-scratch one by more. Its twin tied J on clean val. **So the hidden set
+    does contain images like the hard factors** (scale, clutter, low effective resolution): the first training change
+    since Round 6 that moved the leaderboard.
+  - Leaderboard: rank 13 of 69 (tied 11-13 at 0.910). The legit top 5 is 0.913-0.918 (two entries at 1.000 / 0.972
+    are not credible), so M is 0.3-0.8 points from it.
+  - 1 slot left before 19:00 EST.

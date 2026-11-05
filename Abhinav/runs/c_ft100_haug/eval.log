@@ -1,0 +1,21 @@
+model                              tta           val   mean  worst |  bright+  bright-   contr+   contr-   sat0.5   sat1.5    sharp     blur noise.02 noise.04   jpeg50
+runs/c_ft100_haug/final.pt         flip        97.70  96.35  84.84 |    97.78    97.68    97.68    97.68    97.58    97.58    97.38    97.30    97.48    96.88    84.84
+  + balanced T=1                   flip        97.74  96.62  87.96 |    97.76    97.60    97.72    97.66    97.68    97.52    97.28    97.30    97.46    96.90    87.96
+  hard suite                       flip               93.02  79.40 | lowres16=93.98 lowres24=96.66 zoom_in1.3=96.50 zoom_out0.7=95.50 rot20=93.76 persp0.4=95.78 bg0.7=94.68 confuse0.7=90.88 ambiguous=79.40
+  hard suite + balanced T=1        flip               91.89  69.00 | lowres16=94.04 lowres24=96.56 zoom_in1.3=96.62 zoom_out0.7=95.54 rot20=94.18 persp0.4=96.04 bg0.7=94.44 confuse0.7=90.60 ambiguous=69.00
+                                              vs runs/h_fm800_div/final.pt: only this right 30, only baseline right 36, McNemar p=0.539
+runs/c_ft100_haug/final.pt         flip_shift  97.74  96.44  85.90 |    97.76    97.54    97.78    97.60    97.60    97.52    97.40    97.32    97.60    96.82    85.90
+  + balanced T=1                   flip_shift  97.86  96.74  88.84 |    97.72    97.64    97.72    97.78    97.76    97.58    97.28    97.40    97.56    96.84    88.84
+  hard suite                       flip_shift         93.07  79.60 | lowres16=94.06 lowres24=96.70 zoom_in1.3=96.30 zoom_out0.7=95.52 rot20=94.04 persp0.4=95.78 bg0.7=94.68 confuse0.7=90.94 ambiguous=79.60
+  hard suite + balanced T=1        flip_shift         91.93  68.80 | lowres16=94.16 lowres24=96.68 zoom_in1.3=96.42 zoom_out0.7=95.62 rot20=94.44 persp0.4=95.98 bg0.7=94.44 confuse0.7=90.86 ambiguous=68.80
+                                              vs runs/h_fm800_div/final.pt: only this right 18, only baseline right 27, McNemar p=0.233
+runs/h_fm800_div/final.pt          flip        97.82  96.59  86.58 |    97.80    97.88    97.88    97.90    97.80    97.58    97.36    97.24    97.52    96.94    86.58
+  + balanced T=1                   flip        97.90  96.77  88.32 |    97.92    97.76    97.82    97.92    97.78    97.66    97.42    97.42    97.60    96.86    88.32
+  hard suite                       flip               88.40  80.20 | lowres16=80.80 lowres24=94.88 zoom_in1.3=93.32 zoom_out0.7=86.22 rot20=93.68 persp0.4=95.34 bg0.7=80.46 confuse0.7=90.70 ambiguous=80.20
+  hard suite + balanced T=1        flip               88.74  70.20 | lowres16=83.94 lowres24=94.90 zoom_in1.3=94.04 zoom_out0.7=91.40 rot20=94.46 persp0.4=95.66 bg0.7=83.32 confuse0.7=90.76 ambiguous=70.20
+                                              vs runs/h_fm800_div/final.pt: only this right 0, only baseline right 0, McNemar p=1.000
+runs/h_fm800_div/final.pt          flip_shift  97.92  96.66  86.98 |    97.88    97.86    97.80    97.86    97.76    97.70    97.34    97.24    97.62    97.18    86.98
+  + balanced T=1                   flip_shift  97.96  96.88  88.74 |    97.94    97.88    97.92    97.90    97.84    97.76    97.54    97.34    97.68    97.14    88.74
+  hard suite                       flip_shift         88.78  80.42 | lowres16=80.42 lowres24=94.90 zoom_in1.3=93.20 zoom_out0.7=86.58 rot20=93.82 persp0.4=95.28 bg0.7=82.68 confuse0.7=90.70 ambiguous=81.40
+  hard suite + balanced T=1        flip_shift         88.84  69.20 | lowres16=83.92 lowres24=94.84 zoom_in1.3=93.72 zoom_out0.7=91.66 rot20=94.56 persp0.4=95.58 bg0.7=85.24 confuse0.7=90.82 ambiguous=69.20
+                                              vs runs/h_fm800_div/final.pt: only this right 0, only baseline right 0, McNemar p=1.000

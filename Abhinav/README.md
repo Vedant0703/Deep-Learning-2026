@@ -6,7 +6,7 @@ provided by the course, under a budget of 5,000,000 trainable parameters, for th
 
 ## Results
 
-Every submission is in [`submissions/`](submissions/), one folder each (`Abhinav_Run-D` … `Abhinav_Run-K`, plus
+Every submission is in [`submissions/`](submissions/), one folder each (`Abhinav_Run-D` … `Abhinav_Run-M`, plus
 unsubmitted `candidates/`). Each folder has the model (`model.pt`), the submitted CSV, a class-balanced CSV, the logs,
 the 45k twin used to validate it, and the exact training command.
 
@@ -18,12 +18,17 @@ the 45k twin used to validate it, and the exact training command.
 | G | same as F with Vedant's PreAct 4.98M | 97.58 | **0.901** |
 | H | F at 800 epochs (NYU HPC) | 98.00 | 0.897 |
 | I | H with a diverse 4-teacher ensemble (2x WRN-28-10 SAM, WRN-28-10 AutoAugment, WRN-40-10) | 97.82 | 0.900 |
-| J | Run I's model, flip_shift TTA + class-balanced decoding (no retraining) | 97.96 (fs + bal) | **0.902** |
+| J | Run I's model, flip_shift TTA + class-balanced decoding (no retraining) | 97.96 (fs + bal) | 0.902 |
 | K | Run H's model, flip_shift TTA + class-balanced decoding (no retraining) | 97.98 (fs + bal) | 0.894 |
+| L | Run I's model fine-tuned 100 epochs with on-the-fly hard-factor augmentation (`src/hard.py`), fs + bal | 97.86 (fs + bal) | 0.906 |
+| M | Run I's recipe from scratch with on-the-fly hard-factor augmentation, 600 epochs, fs + bal | 97.96 (fs + bal) | **0.910** |
 
 Function matching was the big lever. After it, every change ties within the ±0.2 twin and ±0.95 public-LB noise.
 Class-balanced decoding (`src.predict --tta flip_shift --balance`, approved by the professor) adds about +0.26 on the
 shifted val suite; on the 1,000 public images it moved I by +2 images (J) and H by -3 (K), which is within noise.
+Round 9's on-the-fly hard-factor augmentation (low resolution, zoom in/out, background clutter; the teacher labels the
+clean image, and augmented images get a 0.5 true-label weight) is the first change since then to move the public
+score: it ties on clean val, lifts a hard-factor suite from 88.4 to 93.7, and gave Run M 0.910 (+0.8 over J).
 The full story is in `notes/key_takeaways.md`, and the HPC workflow (Slurm scripts, babysitter) in `scripts/hpc/`.
 
 ## Repository layout

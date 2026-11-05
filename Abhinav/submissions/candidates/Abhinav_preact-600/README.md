@@ -5,13 +5,15 @@
 | Kaggle public | not submitted (a candidate for the final picks) |
 | Architecture | `preact_v` (`src/models.py`), 4,980,392 trainable parameters |
 | Training data | all 50,000 images, from scratch |
-| Validation (45k twin, none / flip TTA) | twin still training on the HPC |
+| Validation (45k twin, none / flip TTA) | 97.78 / 97.88 |
+| Twin val with class-balanced decoding (flip_shift TTA) | 97.94 (suite mean 96.74; hard-factor suite 88.3) |
 
 ## Files
 
 - `model.pt`: the weights (EMA). Load with `src.train.load_model`.
 - `submission_balanced.csv`: class-balanced decoding (`--tta flip_shift --balance`). Not submitted.
 - `config.json`, `history.json`, `train.log`: all hyperparameters, per-epoch metrics, the log.
+- `twin/`: the same recipe trained on 45k with 5k held out (`runs/h_fm600_pre`), used to validate it. Use it for honest val numbers; `model.pt` has seen every training image.
 
 ## Teacher(s)
 

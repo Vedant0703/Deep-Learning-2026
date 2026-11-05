@@ -329,6 +329,21 @@ The legitimate top of the leaderboard is about 0.914; the #1 entry at 1.000 is n
     - The 4.62M FM student is at its ceiling (about 97.9 clean, 96.8 suite with balancing); the submission choice is
       now about decoding and hedging, not training.
 
+56. **Distillation helps every architecture, and the best baseline is not the best student** (Round 9, 300 epochs,
+    flip TTA). Baselines: preact_v 97.26, resnet_b 97.22, resnet_c 97.12, resnet_a 96.20. With FM KD: resnet_c 97.78,
+    then preact_v / resnet_b / resnet_c_s112 all at 97.58. Gains range from +0.32 (preact_v) to +0.92 (resnet_c_se).
+    resnet_c stays the student.
+57. **Hard-factor augmentation works when it is on the fly, with the teacher on the clean image** (Round 9).
+    - A fixed set of 2,000 hard images (×3) did nothing: twin hard mean 88.0 vs 88.4.
+    - `--hard-aug 0.3 --hard-label-weight 0.5` from scratch (600 epochs) tied Run I's twin on clean / suite
+      (fs + bal 97.96 / 96.88, McNemar p = 0.68) and lifted the hard suite from 88.4 to 93.7 (low-res 16 px
+      80.8 → 94.7, zoom-out 86.2 → 96.2, background 80.5 → 95.6).
+    - Why: each image gets a new transform every epoch, and the student learns the teacher's answer for the clear
+      image, so the teacher's own weakness on hard images is not copied.
+    - **On Kaggle it is the first training change since Round 6 to move the public score:** Run M (from scratch)
+      0.910 and Run L (fine-tune of Run I) 0.906, vs Run J's 0.902 with the same decoding. The hidden set contains
+      images with these factors.
+
 ## 10. Ideas for the next round (ranked by expected value per compute unit)
 
 Phase 3 moved the bottleneck from the teacher to the student, so student-side ideas come first. Teachers already

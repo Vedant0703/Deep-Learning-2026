@@ -31,7 +31,8 @@ import torch
 import torch.nn as nn
 from torchvision.transforms import v2
 
-from .data import CIFAR10_STD, build_loaders
+from .data import CIFAR10_MEAN, CIFAR10_STD, build_loaders
+from .hard import BATCH_FACTORS, hard_batch
 from .models import CONFIGS, PREACT_CONFIGS, TEACHER_CONFIGS, build_model, count_params
 
 
@@ -69,7 +70,19 @@ def get_args(argv=None):
     p.add_argument("--student-noise", type=float, default=0.0,
                    help="max std of Gaussian pixel noise added on the GPU to half the batch, after the teacher has "
                         "seen it clean, so the student learns the teacher's clean prediction on noisy input (0 = off)")
+    p.add_argument("--hard-aug", type=float, default=0.0,
+                   help="fraction of each batch given a random hard factor (src.hard.hard_batch) on the GPU, after the "
+                        "teacher has seen the clean image (0 = off)")
+    p.add_argument("--hard-factors", nargs="+", default=list(BATCH_FACTORS), choices=BATCH_FACTORS)
+    p.add_argument("--hard-label-weight", type=float, default=None,
+                   help="weight of the true-label loss on hard-augmented images (the rest is distillation); "
+                        "default: the same 1 - kd_alpha as other images")
     p.add_argument("--val-size", type=int, default=5000, help="held-out images (0 = train on all 50k)")
+    p.add_argument("--extra-train", default=None,
+                   help=".npz of extra labelled images made from our training images (scripts/make_hard.py)")
+    p.add_argument("--extra-repeat", type=int, default=1, help="times the --extra-train images are repeated per epoch")
+    p.add_argument("--init", default=None,
+                   help="start from the weights of a final.pt from an earlier run of this code (a fine-tune)")
     p.add_argument("--data-dir", default="data")
     p.add_argument("--out", required=True, help="run directory for checkpoints and logs")
     p.add_argument("--ckpt-every", type=int, default=10)
@@ -135,6 +148,13 @@ def distillation_loss(student_logits, teacher_logits, temp):
     return nn.functional.kl_div(nn.functional.log_softmax(student_logits.float() / temp, 1),
                                 nn.functional.log_softmax(teacher_logits.float() / temp, 1),
                                 reduction="batchmean", log_target=True) * temp * temp
+
+
+def distillation_loss_per_image(student_logits, teacher_logits, temp):
+    """distillation_loss for each image separately (its mean over the batch is distillation_loss)."""
+    return nn.functional.kl_div(nn.functional.log_softmax(student_logits.float() / temp, 1),
+                                nn.functional.log_softmax(teacher_logits.float() / temp, 1),
+                                reduction="none", log_target=True).sum(1) * temp * temp
 
 
 def pearson_rows(a, b, eps=1e-8):
@@ -205,7 +225,8 @@ def add_pixel_noise(x, max_std, p=0.5):
 
 def train_one_epoch(model, loader, criterion, optimizer, scheduler, scaler, device, use_amp, mixer, mix_prob,
                     ema=None, teacher=None, kd_alpha=0.0, kd_temp=1.0, student_noise=0.0,
-                    kd_loss=distillation_loss, sam_rho=0.0):
+                    kd_loss=distillation_loss, sam_rho=0.0, hard_aug=0.0, hard_factors=BATCH_FACTORS,
+                    hard_label_weight=None):
     model.train()
     params = [p for p in model.parameters() if p.requires_grad]
     loss_sum = torch.zeros((), device=device)
@@ -226,13 +247,26 @@ def train_one_epoch(model, loader, criterion, optimizer, scheduler, scaler, devi
             with torch.no_grad(), torch.autocast(device.type, dtype=torch.float16, enabled=use_amp):
                 teacher_out = teacher(x, kd_temp)  # same augmented (and mixed) batch, before any student noise
         xs = add_pixel_noise(x, student_noise) if student_noise > 0 else x
+        hard = None
+        if hard_aug > 0:  # after the teacher, so it labels the clean image
+            xs, hard = hard_batch(xs, hard_aug, hard_factors, CIFAR10_MEAN, CIFAR10_STD)
+            if device.type == "cuda":
+                xs = xs.contiguous(memory_format=torch.channels_last)
+        per_image = teacher_out is not None and hard is not None and hard_label_weight is not None
 
         def forward_loss():
             with torch.autocast(device.type, dtype=torch.float16, enabled=use_amp):
                 out = model(xs)
-                loss = criterion(out, target)
-                if teacher_out is not None:
-                    loss = (1 - kd_alpha) * loss + kd_alpha * kd_loss(out, teacher_out, kd_temp)
+                if per_image:  # a larger true-label share on the hard-augmented images
+                    ce = nn.functional.cross_entropy(out.float(), target, reduction="none",
+                                                     label_smoothing=criterion.label_smoothing)
+                    alpha = torch.where(hard, 1 - hard_label_weight, kd_alpha)
+                    loss = ((1 - alpha) * ce
+                            + alpha * distillation_loss_per_image(out, teacher_out, kd_temp)).mean()
+                else:
+                    loss = criterion(out, target)
+                    if teacher_out is not None:
+                        loss = (1 - kd_alpha) * loss + kd_alpha * kd_loss(out, teacher_out, kd_temp)
             return out, loss
 
         out, loss = forward_loss()
@@ -317,12 +351,17 @@ def main(argv=None):
 
     train_loader, val_loader = build_loaders(
         args.data_dir, args.batch_size, args.val_size, args.aug, args.erasing,
-        args.num_workers, args.split_seed, args.subset, args.jitter, args.noise)
+        args.num_workers, args.split_seed, args.subset, args.jitter, args.noise, args.extra_train, args.extra_repeat)
 
     model_kwargs = {"dropout": args.dropout}
     raw_model = build_model(args.model, **model_kwargs).to(device)
     if device.type == "cuda":
         raw_model = raw_model.to(memory_format=torch.channels_last)
+    if args.init:  # our own earlier run's weights (EMA), so the schedule continues it as a fine-tune
+        init = torch.load(args.init, map_location=device)
+        assert init["model_name"] == args.model, f"{args.init} is a {init['model_name']}, not a {args.model}"
+        raw_model.load_state_dict(init["model"])
+        print(f"Initialized from {args.init} (epoch {init.get('epoch')})")
     n_params = count_params(raw_model)
     print(f"Model {args.model}: {n_params:,} trainable parameters | device {device} | AMP {use_amp}")
     print(f"Train images: {len(train_loader.dataset):,} | "
@@ -384,6 +423,7 @@ def main(argv=None):
                     n_params=n_params, epoch=epoch)
 
     kd_loss = dist_loss if args.kd_loss == "dist" else distillation_loss
+    assert args.hard_label_weight is None or args.kd_loss == "kl", "--hard-label-weight needs --kd-loss kl"
     for epoch in range(start_epoch, args.epochs):
         t0 = time.time()
         lr = optimizer.param_groups[0]["lr"]
@@ -391,7 +431,8 @@ def main(argv=None):
         train_loss, train_acc = train_one_epoch(model, train_loader, criterion, optimizer, scheduler,
                                                 scaler, device, use_amp, mixer, mix_prob,
                                                 ema, teacher, args.kd_alpha, args.kd_temp, args.student_noise,
-                                                kd_loss, args.sam_rho)
+                                                kd_loss, args.sam_rho, args.hard_aug, args.hard_factors,
+                                                args.hard_label_weight)
         val_loss, val_acc = evaluate(eval_model, val_loader, device, use_amp) if val_loader else (None, None)
         dt = time.time() - t0
         history.append(dict(epoch=epoch + 1, lr=lr, train_loss=train_loss, train_acc=train_acc,

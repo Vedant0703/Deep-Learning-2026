@@ -154,8 +154,10 @@ def stratified_split(labels, val_size, seed):
 
 
 def build_loaders(data_dir, batch_size=256, val_size=5000, aug="trivial", erasing=0.25,
-                  num_workers=2, seed=0, subset=None, jitter=0.0, noise=0.0):
-    """Returns (train_loader, val_loader). val_loader is None when val_size == 0 (train on all 50k)."""
+                  num_workers=2, seed=0, subset=None, jitter=0.0, noise=0.0, extra_train=None, extra_repeat=1):
+    """Returns (train_loader, val_loader). val_loader is None when val_size == 0 (train on all 50k).
+    extra_train: an .npz of extra labelled images made from our own training images (scripts/make_hard.py),
+    appended extra_repeat times to the training set."""
     images, labels, _ = load_split(data_dir, "train")
     if val_size > 0:
         tr_idx, va_idx = stratified_split(labels, val_size, seed)
@@ -164,7 +166,14 @@ def build_loaders(data_dir, batch_size=256, val_size=5000, aug="trivial", erasin
     if subset:  # tiny runs for debugging
         tr_idx, va_idx = tr_idx[:subset], va_idx[:subset]
 
-    train_ds = ArrayDataset(images[tr_idx], labels[tr_idx], train_transform(aug, erasing, jitter, noise))
+    train_images, train_labels = images[tr_idx], labels[tr_idx]
+    if extra_train:
+        z = np.load(extra_train)
+        # Never train on images derived from the held-out split.
+        assert not np.isin(z["sources"], va_idx).any(), f"{extra_train} uses held-out images"
+        train_images = np.concatenate([train_images] + [z["images"]] * extra_repeat)
+        train_labels = np.concatenate([train_labels] + [z["labels"]] * extra_repeat)
+    train_ds = ArrayDataset(train_images, train_labels, train_transform(aug, erasing, jitter, noise))
     train_loader = _loader(train_ds, batch_size, True, num_workers)
     val_loader = None
     if len(va_idx):

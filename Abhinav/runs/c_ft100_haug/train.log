@@ -1,0 +1,129 @@
+Initialized from runs/h_fm800_div/final.pt (epoch 800)
+Model resnet_c: 4,623,178 trainable parameters | device cuda | AMP True
+Train images: 45,000 | val images: 5,000
+Traceback (most recent call last):
+  File "<frozen runpy>", line 203, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/content/proj/src/train.py", line 463, in <module>
+    main()
+    ~~~~^^
+  File "/content/proj/src/train.py", line 380, in main
+    teacher = TeacherEnsemble([load_model(path, device) for path in args.teacher])
+                               ~~~~~~~~~~^^^^^^^^^^^^^^
+  File "/content/proj/src/train.py", line 112, in load_model
+    ckpt = torch.load(ckpt_path, map_location=device)
+  File "/usr/local/lib/python3.13/dist-packages/torch/serialization.py", line 1530, in load
+    with _open_file_like(f, "rb") as opened_file:
+         ~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/usr/local/lib/python3.13/dist-packages/torch/serialization.py", line 795, in _open_file_like
+    return _open_file(name_or_buffer, mode)
+  File "/usr/local/lib/python3.13/dist-packages/torch/serialization.py", line 776, in __init__
+    super().__init__(open(name, mode))  # noqa: SIM115
+                     ~~~~^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'runs/h_teacher_sam45/final.pt runs/h_teacher_sam45_s1/final.pt runs/h_teacher_aa45/final.pt runs/h_teacher_w40_45/final.pt'
+Initialized from runs/h_fm800_div/final.pt (epoch 800)
+Model resnet_c: 4,623,178 trainable parameters | device cuda | AMP True
+Train images: 45,000 | val images: 5,000
+Teacher runs/h_teacher_sam45/final.pt + runs/h_teacher_sam45_s1/final.pt + runs/h_teacher_aa45/final.pt + runs/h_teacher_w40_45/final.pt: 165,279,336 params | val acc 98.32
+epoch   1/100 | lr 0.0001 | train loss 1.1191 acc 69.48 | val loss 0.0753 acc 97.90 | 24.6s
+epoch   2/100 | lr 0.0200 | train loss 1.7155 acc 60.76 | val loss 0.0831 acc 97.62 | 18.5s
+epoch   3/100 | lr 0.0200 | train loss 1.5199 acc 63.71 | val loss 0.0931 acc 97.36 | 18.5s
+epoch   4/100 | lr 0.0200 | train loss 1.3529 acc 64.10 | val loss 0.0997 acc 97.20 | 18.5s
+epoch   5/100 | lr 0.0200 | train loss 1.2399 acc 65.65 | val loss 0.1049 acc 96.98 | 18.5s
+epoch   6/100 | lr 0.0199 | train loss 1.1972 acc 68.40 | val loss 0.1067 acc 96.88 | 18.5s
+epoch   7/100 | lr 0.0199 | train loss 1.1870 acc 64.12 | val loss 0.1069 acc 96.94 | 18.7s
+epoch   8/100 | lr 0.0198 | train loss 1.1243 acc 69.68 | val loss 0.1070 acc 96.90 | 18.5s
+epoch   9/100 | lr 0.0198 | train loss 1.1644 acc 67.59 | val loss 0.1074 acc 96.80 | 18.4s
+epoch  10/100 | lr 0.0197 | train loss 1.0936 acc 70.62 | val loss 0.1071 acc 96.92 | 18.5s
+epoch  11/100 | lr 0.0196 | train loss 1.0721 acc 69.68 | val loss 0.1057 acc 96.90 | 18.5s
+epoch  12/100 | lr 0.0195 | train loss 1.0520 acc 70.36 | val loss 0.1052 acc 97.04 | 18.5s
+epoch  13/100 | lr 0.0194 | train loss 1.0431 acc 68.80 | val loss 0.1043 acc 97.00 | 18.6s
+epoch  14/100 | lr 0.0193 | train loss 1.0536 acc 66.87 | val loss 0.1026 acc 96.98 | 18.5s
+epoch  15/100 | lr 0.0192 | train loss 1.0653 acc 67.53 | val loss 0.1007 acc 96.98 | 18.5s
+epoch  16/100 | lr 0.0190 | train loss 1.0170 acc 68.09 | val loss 0.0986 acc 97.12 | 18.5s
+epoch  17/100 | lr 0.0189 | train loss 0.9995 acc 70.91 | val loss 0.0976 acc 97.26 | 18.6s
+epoch  18/100 | lr 0.0187 | train loss 1.0052 acc 65.56 | val loss 0.0960 acc 97.36 | 18.6s
+epoch  19/100 | lr 0.0186 | train loss 0.9875 acc 70.21 | val loss 0.0954 acc 97.30 | 18.5s
+epoch  20/100 | lr 0.0184 | train loss 0.9285 acc 74.17 | val loss 0.0945 acc 97.40 | 18.6s
+epoch  21/100 | lr 0.0182 | train loss 0.9817 acc 68.85 | val loss 0.0940 acc 97.28 | 18.6s
+epoch  22/100 | lr 0.0181 | train loss 0.9383 acc 71.67 | val loss 0.0946 acc 97.14 | 18.3s
+epoch  23/100 | lr 0.0179 | train loss 0.9669 acc 69.81 | val loss 0.0942 acc 97.30 | 18.5s
+epoch  24/100 | lr 0.0177 | train loss 0.9725 acc 68.12 | val loss 0.0938 acc 97.30 | 18.5s
+epoch  25/100 | lr 0.0175 | train loss 0.9734 acc 68.28 | val loss 0.0925 acc 97.30 | 18.5s
+epoch  26/100 | lr 0.0172 | train loss 0.9477 acc 72.13 | val loss 0.0919 acc 97.42 | 18.8s
+epoch  27/100 | lr 0.0170 | train loss 0.9487 acc 68.92 | val loss 0.0920 acc 97.30 | 18.5s
+epoch  28/100 | lr 0.0168 | train loss 0.9278 acc 70.74 | val loss 0.0909 acc 97.34 | 18.7s
+epoch  29/100 | lr 0.0165 | train loss 0.9139 acc 70.61 | val loss 0.0902 acc 97.46 | 18.6s
+epoch  30/100 | lr 0.0163 | train loss 0.9167 acc 70.48 | val loss 0.0889 acc 97.52 | 18.5s
+epoch  31/100 | lr 0.0161 | train loss 0.9116 acc 70.33 | val loss 0.0891 acc 97.38 | 18.5s
+epoch  32/100 | lr 0.0158 | train loss 0.9240 acc 71.37 | val loss 0.0903 acc 97.40 | 18.7s
+epoch  33/100 | lr 0.0155 | train loss 0.9051 acc 71.76 | val loss 0.0916 acc 97.32 | 18.6s
+epoch  34/100 | lr 0.0153 | train loss 0.9296 acc 69.14 | val loss 0.0920 acc 97.40 | 18.6s
+epoch  35/100 | lr 0.0150 | train loss 0.9386 acc 68.12 | val loss 0.0916 acc 97.46 | 18.6s
+epoch  36/100 | lr 0.0147 | train loss 0.8584 acc 72.35 | val loss 0.0911 acc 97.40 | 18.7s
+epoch  37/100 | lr 0.0144 | train loss 0.8997 acc 70.12 | val loss 0.0907 acc 97.40 | 18.5s
+epoch  38/100 | lr 0.0142 | train loss 0.8610 acc 72.40 | val loss 0.0907 acc 97.38 | 18.6s
+epoch  39/100 | lr 0.0139 | train loss 0.8810 acc 71.22 | val loss 0.0905 acc 97.40 | 18.5s
+epoch  40/100 | lr 0.0136 | train loss 0.8742 acc 70.86 | val loss 0.0904 acc 97.34 | 18.5s
+epoch  41/100 | lr 0.0133 | train loss 0.9113 acc 68.21 | val loss 0.0905 acc 97.28 | 18.6s
+epoch  42/100 | lr 0.0130 | train loss 0.8373 acc 72.36 | val loss 0.0903 acc 97.34 | 18.5s
+epoch  43/100 | lr 0.0127 | train loss 0.8606 acc 71.72 | val loss 0.0894 acc 97.44 | 18.6s
+epoch  44/100 | lr 0.0124 | train loss 0.8715 acc 69.23 | val loss 0.0883 acc 97.44 | 18.6s
+epoch  45/100 | lr 0.0120 | train loss 0.8704 acc 70.56 | val loss 0.0877 acc 97.52 | 18.6s
+epoch  46/100 | lr 0.0117 | train loss 0.8490 acc 72.72 | val loss 0.0872 acc 97.48 | 18.5s
+epoch  47/100 | lr 0.0114 | train loss 0.8439 acc 72.86 | val loss 0.0863 acc 97.58 | 18.7s
+epoch  48/100 | lr 0.0111 | train loss 0.8397 acc 70.00 | val loss 0.0852 acc 97.62 | 18.7s
+epoch  49/100 | lr 0.0108 | train loss 0.7946 acc 74.72 | val loss 0.0852 acc 97.56 | 18.6s
+epoch  50/100 | lr 0.0105 | train loss 0.8612 acc 69.39 | val loss 0.0858 acc 97.50 | 18.4s
+epoch  51/100 | lr 0.0102 | train loss 0.8411 acc 70.37 | val loss 0.0856 acc 97.54 | 18.6s
+epoch  52/100 | lr 0.0098 | train loss 0.8082 acc 71.34 | val loss 0.0851 acc 97.56 | 18.6s
+epoch  53/100 | lr 0.0095 | train loss 0.8391 acc 70.32 | val loss 0.0848 acc 97.58 | 18.7s
+epoch  54/100 | lr 0.0092 | train loss 0.8161 acc 69.87 | val loss 0.0847 acc 97.62 | 18.6s
+epoch  55/100 | lr 0.0089 | train loss 0.8217 acc 71.13 | val loss 0.0842 acc 97.66 | 18.7s
+epoch  56/100 | lr 0.0086 | train loss 0.7945 acc 71.62 | val loss 0.0848 acc 97.52 | 18.6s
+epoch  57/100 | lr 0.0083 | train loss 0.8165 acc 69.35 | val loss 0.0851 acc 97.52 | 18.6s
+epoch  58/100 | lr 0.0080 | train loss 0.7813 acc 73.45 | val loss 0.0852 acc 97.48 | 18.6s
+epoch  59/100 | lr 0.0076 | train loss 0.7871 acc 70.11 | val loss 0.0847 acc 97.44 | 18.5s
+epoch  60/100 | lr 0.0073 | train loss 0.7646 acc 73.57 | val loss 0.0845 acc 97.44 | 18.5s
+epoch  61/100 | lr 0.0070 | train loss 0.7752 acc 70.61 | val loss 0.0842 acc 97.48 | 18.6s
+epoch  62/100 | lr 0.0067 | train loss 0.7657 acc 73.76 | val loss 0.0842 acc 97.52 | 18.6s
+epoch  63/100 | lr 0.0064 | train loss 0.7683 acc 71.61 | val loss 0.0842 acc 97.52 | 18.6s
+epoch  64/100 | lr 0.0061 | train loss 0.7652 acc 72.94 | val loss 0.0835 acc 97.54 | 18.7s
+epoch  65/100 | lr 0.0058 | train loss 0.7551 acc 70.20 | val loss 0.0833 acc 97.50 | 18.6s
+epoch  66/100 | lr 0.0056 | train loss 0.7719 acc 69.22 | val loss 0.0828 acc 97.56 | 18.5s
+epoch  67/100 | lr 0.0053 | train loss 0.7387 acc 72.06 | val loss 0.0824 acc 97.56 | 18.5s
+epoch  68/100 | lr 0.0050 | train loss 0.7596 acc 73.07 | val loss 0.0823 acc 97.58 | 18.5s
+epoch  69/100 | lr 0.0047 | train loss 0.7151 acc 75.04 | val loss 0.0822 acc 97.66 | 18.4s
+epoch  70/100 | lr 0.0045 | train loss 0.7142 acc 75.38 | val loss 0.0821 acc 97.66 | 18.7s
+epoch  71/100 | lr 0.0042 | train loss 0.7438 acc 71.41 | val loss 0.0813 acc 97.58 | 18.7s
+epoch  72/100 | lr 0.0039 | train loss 0.7249 acc 73.32 | val loss 0.0806 acc 97.54 | 18.7s
+epoch  73/100 | lr 0.0037 | train loss 0.7292 acc 72.73 | val loss 0.0801 acc 97.56 | 18.6s
+epoch  74/100 | lr 0.0035 | train loss 0.7299 acc 75.92 | val loss 0.0797 acc 97.60 | 18.7s
+epoch  75/100 | lr 0.0032 | train loss 0.7233 acc 71.92 | val loss 0.0793 acc 97.60 | 18.7s
+epoch  76/100 | lr 0.0030 | train loss 0.7060 acc 75.91 | val loss 0.0789 acc 97.60 | 18.6s
+epoch  77/100 | lr 0.0028 | train loss 0.7253 acc 71.50 | val loss 0.0786 acc 97.62 | 18.4s
+epoch  78/100 | lr 0.0025 | train loss 0.7149 acc 74.84 | val loss 0.0783 acc 97.60 | 18.4s
+epoch  79/100 | lr 0.0023 | train loss 0.6936 acc 73.48 | val loss 0.0783 acc 97.60 | 18.5s
+epoch  80/100 | lr 0.0021 | train loss 0.6873 acc 74.86 | val loss 0.0781 acc 97.60 | 18.6s
+epoch  81/100 | lr 0.0019 | train loss 0.7181 acc 75.08 | val loss 0.0782 acc 97.60 | 18.7s
+epoch  82/100 | lr 0.0018 | train loss 0.7062 acc 72.29 | val loss 0.0782 acc 97.54 | 18.5s
+epoch  83/100 | lr 0.0016 | train loss 0.6919 acc 73.34 | val loss 0.0781 acc 97.56 | 18.5s
+epoch  84/100 | lr 0.0014 | train loss 0.7350 acc 71.15 | val loss 0.0777 acc 97.58 | 18.5s
+epoch  85/100 | lr 0.0013 | train loss 0.6905 acc 72.10 | val loss 0.0774 acc 97.68 | 18.6s
+epoch  86/100 | lr 0.0011 | train loss 0.6584 acc 75.73 | val loss 0.0773 acc 97.68 | 18.5s
+epoch  87/100 | lr 0.0010 | train loss 0.6931 acc 72.13 | val loss 0.0770 acc 97.68 | 18.6s
+epoch  88/100 | lr 0.0008 | train loss 0.7431 acc 68.98 | val loss 0.0768 acc 97.72 | 18.5s
+epoch  89/100 | lr 0.0007 | train loss 0.7075 acc 71.69 | val loss 0.0767 acc 97.70 | 18.4s
+epoch  90/100 | lr 0.0006 | train loss 0.6986 acc 73.50 | val loss 0.0767 acc 97.68 | 18.5s
+epoch  91/100 | lr 0.0005 | train loss 0.6600 acc 76.64 | val loss 0.0767 acc 97.66 | 18.6s
+epoch  92/100 | lr 0.0004 | train loss 0.7137 acc 71.39 | val loss 0.0768 acc 97.70 | 18.7s
+epoch  93/100 | lr 0.0003 | train loss 0.6619 acc 76.66 | val loss 0.0769 acc 97.66 | 18.6s
+epoch  94/100 | lr 0.0002 | train loss 0.7145 acc 72.89 | val loss 0.0768 acc 97.66 | 18.5s
+epoch  95/100 | lr 0.0002 | train loss 0.6860 acc 72.67 | val loss 0.0768 acc 97.68 | 18.4s
+epoch  96/100 | lr 0.0001 | train loss 0.7189 acc 71.89 | val loss 0.0768 acc 97.66 | 18.5s
+epoch  97/100 | lr 0.0001 | train loss 0.6593 acc 71.70 | val loss 0.0769 acc 97.64 | 18.5s
+epoch  98/100 | lr 0.0000 | train loss 0.6847 acc 71.90 | val loss 0.0769 acc 97.62 | 18.7s
+epoch  99/100 | lr 0.0000 | train loss 0.7025 acc 73.31 | val loss 0.0768 acc 97.64 | 18.7s
+epoch 100/100 | lr 0.0000 | train loss 0.6799 acc 72.14 | val loss 0.0768 acc 97.62 | 18.7s
+Trainable parameters: 4,623,178
+Final val accuracy: 97.62% (flip TTA: 97.72%) | best: 97.90%
