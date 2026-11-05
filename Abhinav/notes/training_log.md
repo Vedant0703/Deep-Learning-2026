@@ -1980,3 +1980,53 @@ images; augmentations of them are allowed; no external data or weights; no evalu
   - Final-pick candidates: M plus L, or plus Dhanush's G (a different architecture, so a more decorrelated hedge).
   - The team PDF (v2) now credits runs by person (Vedant: A, B and his own Run D 0.895; teammate: C; Abhinav: D-M;
     Dhanush: the Nov 5 G) and adds Dhanush's result.
+
+## Round 10 (Nov 5 afternoon to Nov 6): building on hard augmentation, robustly
+- **Plan:** `~/.claude/plans/the-high-level-goal-rosy-star.md`.
+  - New pairs: PreAct + hard aug, 6 factors (+ rotation, perspective), wide levels.
+  - Scale-aware TTA tested on the twins under a pre-registered rule.
+  - Selection by twin, decorrelation on held-out errors, and the final picks pre-registered so public noise
+    can't drive them.
+- **Do the report's approaches still hold?**
+  - Function matching: yes.
+  - resnet_c vs PreAct: resnet_c wins on the twin, but public is a tie (0.901-0.904), and PreAct had never had
+    hard aug.
+  - Longer training / diverse teachers: tie.
+  - fs+bal: weak (twin suite +0.2; public ±0.3; Dhanush's 0.904 used none); kept as the pre-registered rule.
+  - On-the-fly hard aug: strongly yes. It even lifts *untrained* factors a little (rot, persp, confuse,
+    ambiguous: +0.4 on average), so it generalises.
+  - Fixed hard set: no.
+- **15:00 EST code** (`src/hard.py` 61908988a52768a7, `src/train.py` 220d94ca676bffca; both on the HPC via
+  hash-verified patches):
+  - `hard_batch` gains `rotate` / `perspective` (`ALL_BATCH_FACTORS`, both device-safe) and a level table
+    `HARD_LEVELS` ({default, wide}; `--hard-levels`).
+  - `tta_probs` gains `flip_shift_scale` (14 views: fs + both flips zoomed 1.15x and 0.875x); `TTA_CHOICES` is
+    shared with evaluate and predict.
+  - Checks:
+    - the default path is bit-identical to Run M's `hard_batch` (same seed, same output);
+    - the hard suite is unchanged (Figure 1 regenerates byte-identical);
+    - 1-epoch smoke tests pass for preact_v + hard aug and for 6 factors + wide;
+    - `config.json` records `hard_factors` and `hard_levels`.
+- **Queue** (`runs/jobs.txt`, local copy `scripts/hpc/jobs_round10.txt`; job lines verified identical by hash):
+  `h_{fm,final}600_pre_haug`, `h_{fm,final}600_haug6`, `h_{fm,final}600_haugw`, behind Round 9e. 9e status at
+  19:12 UTC: `h_fm800_haug` epoch 65/800, `h_fm600_haug5` 65/600, `h_final600_haug5` 59/600, `h_final800_haug`
+  pending.
+- **Held-out error overlap with M's twin** (flip TTA; M has 103 errors):
+
+  | Twin | Errors | Both wrong | Only M wrong | Only other wrong | Jaccard |
+  |---|---|---|---|---|---|
+  | L's twin `c_ft100_haug` | 115 | 86 | 17 | 29 | 0.65 |
+  | PreAct-600 `h_fm600_pre` | 106 | 81 | 22 | 25 | 0.63 |
+  | Run I `h_fm800_div` | 109 | 76 | 27 | 33 | 0.56 |
+  | Run H `h_fm800` | 100 | 71 | 32 | 29 | 0.54 |
+  | Abhinav's G `r2_twin_S` (PreAct 300) | 121 | 77 | 26 | 44 | 0.52 |
+
+  - L is the *least* decorrelated from M, so it is a weak hedge for the private half.
+- **15:00 EST: Dhanush's 0.904 is a re-decoding of Abhinav's Run G** (branch `dhanush/run-g-tta-0904`, folder
+  `Abhinav/submissions/Dhanush_Run-G-TTA`).
+  - Same `r2_final_S` weights (preact_v, FM KD from `teacher_wrn300`, 300 epochs) with `--tta flip_shift`, no
+    balancing; 31 of 2,000 labels changed from Run G.
+  - Its twin: 97.58 flip → 97.76 fs; public 0.901 → 0.904. So the three best team scores are all Abhinav's models
+    (M, L, G).
+  - Run G's twin is the most decorrelated from M's twin on held-out errors (Jaccard 0.52): the best hedge candidate.
+  - The PDF (v3) is corrected to say so.

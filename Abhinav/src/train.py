@@ -32,7 +32,7 @@ import torch.nn as nn
 from torchvision.transforms import v2
 
 from .data import CIFAR10_MEAN, CIFAR10_STD, build_loaders
-from .hard import BATCH_FACTORS, hard_batch
+from .hard import ALL_BATCH_FACTORS, BATCH_FACTORS, HARD_LEVELS, hard_batch
 from .models import CONFIGS, PREACT_CONFIGS, TEACHER_CONFIGS, build_model, count_params
 
 
@@ -73,7 +73,9 @@ def get_args(argv=None):
     p.add_argument("--hard-aug", type=float, default=0.0,
                    help="fraction of each batch given a random hard factor (src.hard.hard_batch) on the GPU, after the "
                         "teacher has seen the clean image (0 = off)")
-    p.add_argument("--hard-factors", nargs="+", default=list(BATCH_FACTORS), choices=BATCH_FACTORS)
+    p.add_argument("--hard-factors", nargs="+", default=list(BATCH_FACTORS), choices=ALL_BATCH_FACTORS)
+    p.add_argument("--hard-levels", default="default", choices=sorted(HARD_LEVELS),
+                   help="level ranges for --hard-aug (src.hard.HARD_LEVELS); 'wide' reaches smaller, blurrier objects")
     p.add_argument("--hard-label-weight", type=float, default=None,
                    help="weight of the true-label loss on hard-augmented images (the rest is distillation); "
                         "default: the same 1 - kd_alpha as other images")
@@ -226,7 +228,7 @@ def add_pixel_noise(x, max_std, p=0.5):
 def train_one_epoch(model, loader, criterion, optimizer, scheduler, scaler, device, use_amp, mixer, mix_prob,
                     ema=None, teacher=None, kd_alpha=0.0, kd_temp=1.0, student_noise=0.0,
                     kd_loss=distillation_loss, sam_rho=0.0, hard_aug=0.0, hard_factors=BATCH_FACTORS,
-                    hard_label_weight=None):
+                    hard_label_weight=None, hard_levels="default"):
     model.train()
     params = [p for p in model.parameters() if p.requires_grad]
     loss_sum = torch.zeros((), device=device)
@@ -249,7 +251,7 @@ def train_one_epoch(model, loader, criterion, optimizer, scheduler, scaler, devi
         xs = add_pixel_noise(x, student_noise) if student_noise > 0 else x
         hard = None
         if hard_aug > 0:  # after the teacher, so it labels the clean image
-            xs, hard = hard_batch(xs, hard_aug, hard_factors, CIFAR10_MEAN, CIFAR10_STD)
+            xs, hard = hard_batch(xs, hard_aug, hard_factors, CIFAR10_MEAN, CIFAR10_STD, hard_levels)
             if device.type == "cuda":
                 xs = xs.contiguous(memory_format=torch.channels_last)
         per_image = teacher_out is not None and hard is not None and hard_label_weight is not None
@@ -295,22 +297,41 @@ def train_one_epoch(model, loader, criterion, optimizer, scheduler, scaler, devi
 
 
 TTA_SHIFTS = ((0, 0), (2, 0), (-2, 0), (0, 2), (0, -2))
+TTA_CHOICES = ("none", "flip", "flip_shift", "flip_shift_scale")
+
+
+def _rescale(v, factor):
+    """Zoom a normalized batch about its centre: factor > 1 crops and enlarges, factor < 1 shrinks and pads with
+    the edge pixels (as src.hard.zoom_in / zoom_out do)."""
+    h = v.shape[-1]
+    if factor > 1:
+        c = round(h / factor)
+        o = (h - c) // 2
+        return nn.functional.interpolate(v[..., o:o + c, o:o + c], size=(h, h), mode="bilinear", align_corners=False)
+    s = round(h * factor)
+    lo = (h - s) // 2
+    small = nn.functional.interpolate(v, size=(s, s), mode="bilinear", antialias=True, align_corners=False)
+    return nn.functional.pad(small, (lo, h - s - lo, lo, h - s - lo), mode="replicate")
 
 
 def tta_probs(model, x, tta="flip"):
     """Softmax averaged over test-time views.
 
     "none": the image only; "flip" (or True): image + horizontal flip;
-    "flip_shift": both of those, each also shifted by 2 pixels in four directions (10 views).
+    "flip_shift": both of those, each also shifted by 2 pixels in four directions (10 views);
+    "flip_shift_scale": flip_shift plus both flips zoomed in 1.15x and out 0.875x (14 views).
     """
     if tta is True:
         tta = "flip"
     views = [x]
-    if tta in ("flip", "flip_shift"):
+    if tta in ("flip", "flip_shift", "flip_shift_scale"):
         views.append(torch.flip(x, dims=[3]))
-    if tta == "flip_shift":
-        padded = [nn.functional.pad(v, (2, 2, 2, 2), mode="reflect") for v in views]
+    if tta in ("flip_shift", "flip_shift_scale"):
+        flips = views
+        padded = [nn.functional.pad(v, (2, 2, 2, 2), mode="reflect") for v in flips]
         views = [p[:, :, 2 + dy:34 + dy, 2 + dx:34 + dx] for p in padded for dy, dx in TTA_SHIFTS]
+        if tta == "flip_shift_scale":
+            views += [_rescale(v, f) for v in flips for f in (1.15, 0.875)]
     return torch.stack([model(v).float().softmax(1) for v in views]).mean(0)
 
 
@@ -432,7 +453,7 @@ def main(argv=None):
                                                 scaler, device, use_amp, mixer, mix_prob,
                                                 ema, teacher, args.kd_alpha, args.kd_temp, args.student_noise,
                                                 kd_loss, args.sam_rho, args.hard_aug, args.hard_factors,
-                                                args.hard_label_weight)
+                                                args.hard_label_weight, args.hard_levels)
         val_loss, val_acc = evaluate(eval_model, val_loader, device, use_amp) if val_loader else (None, None)
         dt = time.time() - t0
         history.append(dict(epoch=epoch + 1, lr=lr, train_loss=train_loss, train_acc=train_acc,

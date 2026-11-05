@@ -4,7 +4,8 @@ clutter and class similarity. Each output keeps its source image's label (the ma
 Used two ways, always on images from the permitted training set:
 - the hard suite (src.evaluate --hard-suite): every factor at a fixed level on the 5k held-out split, to examine
   where a model fails;
-- a training set (scripts/make_hard.py): 2,000 images from the 45k training side with 1-2 random factors each.
+- a training set (scripts/make_hard.py): 2,000 images from the 45k training side with 1-2 random factors each;
+- on-the-fly training augmentation (hard_batch, `src.train --hard-aug`), the version that worked (Runs L and M).
 
 All ops take float images in [0, 1], shape [N, 3, H, W], and per-image parameters, so results are reproducible.
 """
@@ -76,7 +77,7 @@ def blend(x, other, lam):
 
 def rotate(x, degrees):
     """Rotate each image by its angle (degrees, per image), reflecting at the borders."""
-    a = torch.as_tensor(degrees, dtype=x.dtype).view(-1) * math.pi / 180
+    a = torch.as_tensor(degrees, dtype=x.dtype, device=x.device).view(-1) * math.pi / 180
     cos, sin, zero = torch.cos(a), torch.sin(a), torch.zeros_like(a)
     theta = torch.stack([torch.stack([cos, -sin, zero], 1), torch.stack([sin, cos, zero], 1)], 1)
     grid = F.affine_grid(theta, list(x.shape), align_corners=False)
@@ -86,9 +87,10 @@ def rotate(x, degrees):
 def perspective(x, offsets):
     """Perspective warp: offsets [N, 4, 2] move the four corners, in normalized units (the side is 2)."""
     n = x.shape[0]
-    src = torch.tensor([[-1, -1], [1, -1], [1, 1], [-1, 1]], dtype=x.dtype).expand(n, 4, 2)
-    dst = src + torch.as_tensor(offsets, dtype=x.dtype)
-    # Homography mapping output (dst) coordinates to input (src) coordinates, solved per image (8 unknowns).
+    src = torch.tensor([[-1, -1], [1, -1], [1, 1], [-1, 1]], dtype=torch.float32).expand(n, 4, 2)
+    dst = src + torch.as_tensor(offsets, dtype=torch.float32).cpu()
+    # Homography mapping output (dst) coordinates to input (src) coordinates, solved per image (8 unknowns) on the
+    # CPU, where torch.linalg.solve works for every backend; only the sampling grid goes to x's device.
     rows, rhs = [], []
     for d, c in zip(dst.unbind(1), src.unbind(1)):
         (u, v), (xs, ys) = d.unbind(-1), c.unbind(-1)
@@ -97,13 +99,13 @@ def perspective(x, offsets):
                  torch.stack([zero, zero, zero, u, v, one, -u * ys, -v * ys], 1)]
         rhs += [xs, ys]
     h = torch.linalg.solve(torch.stack(rows, 1), torch.stack(rhs, 1))
-    hm = torch.cat([h, torch.ones(n, 1, dtype=x.dtype)], 1).view(n, 3, 3)
+    hm = torch.cat([h, torch.ones(n, 1)], 1).view(n, 3, 3)
     size = x.shape[-1]
-    lin = (torch.arange(size, dtype=x.dtype) * 2 + 1) / size - 1
+    lin = (torch.arange(size, dtype=torch.float32) * 2 + 1) / size - 1
     gy, gx = torch.meshgrid(lin, lin, indexing="ij")
     pts = torch.stack([gx, gy, torch.ones_like(gx)], -1).view(1, -1, 3)
     mapped = pts @ hm.transpose(1, 2)
-    grid = (mapped[..., :2] / mapped[..., 2:]).view(n, size, size, 2)
+    grid = (mapped[..., :2] / mapped[..., 2:]).view(n, size, size, 2).to(x.device, x.dtype)
     return F.grid_sample(x, grid, mode="bilinear", padding_mode="reflection", align_corners=False)
 
 
@@ -165,13 +167,26 @@ def hard_suite_images(images, labels, seed=0):
 
 
 FACTORS = ("lowres", "zoom_in", "zoom_out", "rotate", "perspective", "background", "confuse")
-BATCH_FACTORS = ("lowres", "zoom_in", "zoom_out", "background")  # the ones hard_batch can apply on the fly
+BATCH_FACTORS = ("lowres", "zoom_in", "zoom_out", "background")  # hard_batch's default factors (Runs L and M)
+ALL_BATCH_FACTORS = BATCH_FACTORS + ("rotate", "perspective")  # every factor hard_batch can apply on the fly
+
+# Level ranges per factor: "default" is the training range of Runs L and M; "wide" reaches smaller, blurrier and
+# more zoomed objects. Each entry maps u ~ U(0, 1) (one draw per factor per batch) to a level.
+HARD_LEVELS = {
+    "default": {"lowres": lambda u: (12, 16, 20, 24)[int(u * 4)], "zoom_in": lambda u: 1.2 + 0.3 * u,
+                "zoom_out": lambda u: 0.6 + 0.25 * u, "background": lambda u: 0.6 + 0.25 * u,
+                "rotate": lambda u: 15 + 15 * u, "perspective": lambda u: 0.3 + 0.2 * u},
+    "wide": {"lowres": lambda u: (8, 12, 16, 20, 24)[int(u * 5)], "zoom_in": lambda u: 1.2 + 0.6 * u,
+             "zoom_out": lambda u: 0.5 + 0.35 * u, "background": lambda u: 0.5 + 0.35 * u,
+             "rotate": lambda u: 15 + 15 * u, "perspective": lambda u: 0.3 + 0.2 * u},
+}
 
 
-def hard_batch(x, p, factors, mean, std):
+def hard_batch(x, p, factors, mean, std, levels="default"):
     """On-the-fly hard augmentation of a normalized training batch, on its device: a random fraction p of the images
-    gets one random factor from `factors` (BATCH_FACTORS), with one level per factor per batch drawn from the training
-    ranges. Background partners are other images of the same batch. Returns (batch, bool mask of changed images)."""
+    gets one random factor from `factors` (ALL_BATCH_FACTORS), with one level per factor per batch drawn from
+    HARD_LEVELS[levels]. Background partners are other images of the same batch; rotations get a random sign and
+    perspective warps random corner offsets per image. Returns (batch, bool mask of changed images)."""
     n = x.shape[0]
     mask = torch.rand(n, device=x.device) < p
     if not mask.any():
@@ -186,15 +201,21 @@ def hard_batch(x, p, factors, mean, std):
         sel = mask & (which == k)
         if not sel.any():
             continue
-        u = torch.rand(()).item()
+        level = HARD_LEVELS[levels][name](torch.rand(()).item())
         if name == "lowres":
-            out[sel] = low_res(img[sel], (12, 16, 20, 24)[int(u * 4)])
+            out[sel] = low_res(img[sel], level)
         elif name == "zoom_in":
-            out[sel] = zoom_in(img[sel], 1.2 + 0.3 * u)
+            out[sel] = zoom_in(img[sel], level)
         elif name == "zoom_out":
-            out[sel] = zoom_out(img[sel], 0.6 + 0.25 * u)
+            out[sel] = zoom_out(img[sel], level)
         elif name == "background":
-            out[sel] = background(img[sel], partner[sel], 0.6 + 0.25 * u)
+            out[sel] = background(img[sel], partner[sel], level)
+        elif name == "rotate":
+            k_sel = int(sel.sum())
+            sign = torch.randint(2, (k_sel,), device=x.device).float() * 2 - 1
+            out[sel] = rotate(img[sel], sign * level)
+        elif name == "perspective":
+            out[sel] = perspective(img[sel], (torch.rand(int(sel.sum()), 4, 2) * 2 - 1) * level)
         else:
             raise ValueError(f"hard_batch does not support '{name}'")
     return torch.where(mask.view(-1, 1, 1, 1), (out - m) / s, x), mask  # others untouched (not even clamped)

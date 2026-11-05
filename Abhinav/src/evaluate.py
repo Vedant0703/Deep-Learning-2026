@@ -27,7 +27,7 @@ import torch
 from .data import CLASSES, ArrayDataset, build_val_loader, eval_transform, load_split, stratified_split, _loader
 from .hard import HARD_SUITE, hard_suite_images
 from .predict import balance_probs, em_prior_probs
-from .train import TeacherEnsemble, evaluate, get_device, load_model, tta_probs
+from .train import TTA_CHOICES, TeacherEnsemble, evaluate, get_device, load_model, tta_probs
 
 SUITE = {
     "bright+": [("brightness", 1.2)],
@@ -106,7 +106,7 @@ def main(argv=None):
     p.add_argument("--data-dir", default="data")
     p.add_argument("--val-size", type=int, default=5000)
     p.add_argument("--seed", type=int, default=0, help="split seed (the training runs' --split-seed)")
-    p.add_argument("--tta", nargs="+", default=["flip"], choices=["none", "flip", "flip_shift"])
+    p.add_argument("--tta", nargs="+", default=["flip"], choices=TTA_CHOICES)
     p.add_argument("--baseline", help="checkpoint to compare against with a paired McNemar test on the clean images")
     p.add_argument("--reference", help="checkpoint (usually the teacher) to measure top-1 agreement and KL against")
     p.add_argument("--split", default="val", choices=["val", "train"],

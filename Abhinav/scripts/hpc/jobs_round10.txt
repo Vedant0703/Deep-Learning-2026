@@ -1,0 +1,77 @@
+# NAME|SBATCH_OPTS|TRAIN_ARGS|FILES_NEEDED_FIRST
+h_final1600|--time=12:00:00|--model resnet_c --epochs 1600 @C --teacher runs/teacher50/final.pt --val-size 0|
+h_fm1600|--time=12:00:00|--model resnet_c --epochs 1600 @C --teacher runs/teacher_wrn300/final.pt|
+#h_fm800_ens2|--time=10:00:00|--model resnet_c --epochs 800 @C --teacher runs/teacher_wrn300/final.pt runs/h_teacher_sam45/final.pt|
+#h_final800_ens2|--time=10:00:00|--model resnet_c --epochs 800 @C --val-size 0 --teacher runs/teacher50/final.pt runs/h_teacher_sam50/final.pt|
+h_teacher_sam45_s1||@T --seed 1|
+#h_teacher_sam45_s2||@T --seed 2|
+#h_teacher_sam50_s1||@T --seed 1 --val-size 0|
+h_teacher_sam50_s2||@T --seed 2 --val-size 0|
+#h_fm800_ens4|--time=16:00:00|--model resnet_c --epochs 800 @C --teacher runs/teacher_wrn300/final.pt runs/h_teacher_sam45/final.pt runs/h_teacher_sam45_s1/final.pt runs/h_teacher_sam45_s2/final.pt|runs/h_teacher_sam45_s1/final.pt runs/h_teacher_sam45_s2/final.pt
+#h_final800_ens4|--time=16:00:00|--model resnet_c --epochs 800 @C --val-size 0 --teacher runs/teacher50/final.pt runs/h_teacher_sam50/final.pt runs/h_teacher_sam50_s1/final.pt runs/h_teacher_sam50_s2/final.pt|runs/h_teacher_sam50_s1/final.pt runs/h_teacher_sam50_s2/final.pt
+h_fm800_a1||--model resnet_c --epochs 800 @C --kd-alpha 1.0 --teacher runs/teacher_wrn300/final.pt|
+h_fm800_nn||--model resnet_c --epochs 800 --ema 0.999 --student-noise 0 --mix-alpha 1.0 --mix-prob 0.5 --teacher runs/teacher_wrn300/final.pt|
+h_fm800_sam||--model resnet_c --epochs 800 @C --teacher runs/h_teacher_sam45/final.pt|
+h_final800_sam||--model resnet_c --epochs 800 @C --val-size 0 --teacher runs/h_teacher_sam50/final.pt|
+h_teacher_aa45||@T --seed 3 --aug autoaugment|
+h_teacher_aa50||@T --seed 3 --aug autoaugment --val-size 0|
+h_teacher_w40_45|--time=12:00:00|--model wrn40_10 --epochs 300 --ema 0.999 --label-smoothing 0 --sam-rho 0.05 --seed 4|
+h_teacher_w40_50|--time=12:00:00|--model wrn40_10 --epochs 300 --ema 0.999 --label-smoothing 0 --sam-rho 0.05 --seed 4 --val-size 0|
+h_fm800_ens3|--time=12:00:00|--model resnet_c --epochs 800 @C --teacher runs/teacher_wrn300/final.pt runs/h_teacher_sam45/final.pt runs/h_teacher_sam45_s1/final.pt|runs/h_teacher_sam45_s1/final.pt
+h_final800_ens3|--time=12:00:00|--model resnet_c --epochs 800 @C --val-size 0 --teacher runs/teacher50/final.pt runs/h_teacher_sam50/final.pt runs/h_teacher_sam50_s2/final.pt|runs/h_teacher_sam50_s2/final.pt
+# Round 7 (Nov 4 06:20 EST): 4-teacher diverse students (teacher set 98.38 on val), then a second diverse teacher round
+h_fm800_div|--time=12:00:00|--model resnet_c --epochs 800 @C --teacher runs/h_teacher_sam45/final.pt runs/h_teacher_sam45_s1/final.pt runs/h_teacher_aa45/final.pt runs/h_teacher_w40_45/final.pt|runs/h_teacher_aa45/final.pt runs/h_teacher_w40_45/final.pt
+h_final800_div|--time=12:00:00|--model resnet_c --epochs 800 @C --val-size 0 --teacher runs/h_teacher_sam50/final.pt runs/h_teacher_sam50_s2/final.pt runs/h_teacher_aa50/final.pt runs/h_teacher_w40_50/final.pt|runs/h_teacher_aa50/final.pt runs/h_teacher_w40_50/final.pt
+h_teacher_aa45_s2||@T --seed 5 --aug autoaugment|runs/h_teacher_w40_50/final.pt
+h_teacher_aa50_s2||@T --seed 5 --aug autoaugment --val-size 0|runs/h_teacher_w40_50/final.pt
+h_teacher_w40aa45|--time=12:00:00|--model wrn40_10 --epochs 300 --ema 0.999 --label-smoothing 0 --sam-rho 0.05 --seed 6 --aug autoaugment|runs/h_teacher_w40_50/final.pt
+h_teacher_w40aa50|--time=12:00:00|--model wrn40_10 --epochs 300 --ema 0.999 --label-smoothing 0 --sam-rho 0.05 --seed 6 --aug autoaugment --val-size 0|runs/h_teacher_w40_50/final.pt
+# Round 8 (Nov 4 13:10 EST): one-factor arms on the div recipe, 600 epochs, twin + final each
+h_fm600_mixoff|--time=12:00:00|--model resnet_c --epochs 600 @C --mix-off-epochs 30 --teacher runs/h_teacher_sam45/final.pt runs/h_teacher_sam45_s1/final.pt runs/h_teacher_aa45/final.pt runs/h_teacher_w40_45/final.pt|
+h_final600_mixoff|--time=12:00:00|--model resnet_c --epochs 600 @C --mix-off-epochs 30 --val-size 0 --teacher runs/h_teacher_sam50/final.pt runs/h_teacher_sam50_s2/final.pt runs/h_teacher_aa50/final.pt runs/h_teacher_w40_50/final.pt|
+h_fm600_dist|--time=12:00:00|--model resnet_c --epochs 600 @C --kd-loss dist --kd-alpha 0.67 --teacher runs/h_teacher_sam45/final.pt runs/h_teacher_sam45_s1/final.pt runs/h_teacher_aa45/final.pt runs/h_teacher_w40_45/final.pt|
+h_final600_dist|--time=12:00:00|--model resnet_c --epochs 600 @C --kd-loss dist --kd-alpha 0.67 --val-size 0 --teacher runs/h_teacher_sam50/final.pt runs/h_teacher_sam50_s2/final.pt runs/h_teacher_aa50/final.pt runs/h_teacher_w40_50/final.pt|
+h_fm600_pre|--time=12:00:00|--model preact_v --epochs 600 @C --teacher runs/h_teacher_sam45/final.pt runs/h_teacher_sam45_s1/final.pt runs/h_teacher_aa45/final.pt runs/h_teacher_w40_45/final.pt|
+h_final600_pre|--time=12:00:00|--model preact_v --epochs 600 @C --val-size 0 --teacher runs/h_teacher_sam50/final.pt runs/h_teacher_sam50_s2/final.pt runs/h_teacher_aa50/final.pt runs/h_teacher_w40_50/final.pt|
+h_fm600_t1|--time=12:00:00|--model resnet_c --epochs 600 @C --kd-temp 1 --teacher runs/h_teacher_sam45/final.pt runs/h_teacher_sam45_s1/final.pt runs/h_teacher_aa45/final.pt runs/h_teacher_w40_45/final.pt|
+h_final600_t1|--time=12:00:00|--model resnet_c --epochs 600 @C --kd-temp 1 --val-size 0 --teacher runs/h_teacher_sam50/final.pt runs/h_teacher_sam50_s2/final.pt runs/h_teacher_aa50/final.pt runs/h_teacher_w40_50/final.pt|
+# Round 9 (Nov 5 03:30 EST): architecture baselines without distillation (300 epochs, @C, no teacher),
+# plus the two missing KD arms (same flags + teacher_wrn300, as r1_fm / p1_* / r2_twin_S)
+h_base300_c|--time=04:00:00|--model resnet_c --epochs 300 @C|
+h_base300_pre|--time=04:00:00|--model preact_v --epochs 300 @C|
+h_base300_a|--time=04:00:00|--model resnet_a --epochs 300 @C|
+h_base300_b|--time=04:00:00|--model resnet_b --epochs 300 @C|
+h_kd300_a|--time=04:00:00|--model resnet_a --epochs 300 @C --teacher runs/teacher_wrn300/final.pt|
+h_kd300_b|--time=04:00:00|--model resnet_b --epochs 300 @C --teacher runs/teacher_wrn300/final.pt|
+h_base300_cse|--time=04:00:00|--model resnet_c_se --epochs 300 @C|
+h_base300_chr|--time=04:00:00|--model resnet_c_hr --epochs 300 @C|
+h_base300_cs112|--time=05:00:00|--model resnet_c_s112 --epochs 300 @C|
+# Round 9b (Nov 5 03:22 EST): fine-tunes of Run I's model and twin (100 epochs, lr 0.02) with the hard-factor set
+# (scripts/make_hard.py --factors lowres zoom_in zoom_out background, 2,000 images from the 45k side, repeated 3x),
+# a no-extra-data control, then the same set from scratch at 600 epochs
+h_ft100_hard|--time=03:00:00|--model resnet_c --epochs 100 --lr 0.02 --warmup-epochs 1 @C --init runs/h_fm800_div/final.pt --extra-train data/cache/hard_train2k.npz --extra-repeat 3 --teacher runs/h_teacher_sam45/final.pt runs/h_teacher_sam45_s1/final.pt runs/h_teacher_aa45/final.pt runs/h_teacher_w40_45/final.pt|data/cache/hard_train2k.npz
+h_ft100_ctrl|--time=03:00:00|--model resnet_c --epochs 100 --lr 0.02 --warmup-epochs 1 @C --init runs/h_fm800_div/final.pt --teacher runs/h_teacher_sam45/final.pt runs/h_teacher_sam45_s1/final.pt runs/h_teacher_aa45/final.pt runs/h_teacher_w40_45/final.pt|
+#h_ftfinal100_hard|--time=03:00:00|--model resnet_c --epochs 100 --lr 0.02 --warmup-epochs 1 @C --val-size 0 --init runs/h_final800_div/final.pt --extra-train data/cache/hard_train2k.npz --extra-repeat 3 --teacher runs/h_teacher_sam50/final.pt runs/h_teacher_sam50_s2/final.pt runs/h_teacher_aa50/final.pt runs/h_teacher_w40_50/final.pt|data/cache/hard_train2k.npz
+#h_fm600_hard|--time=12:00:00|--model resnet_c --epochs 600 @C --extra-train data/cache/hard_train2k.npz --extra-repeat 3 --teacher runs/h_teacher_sam45/final.pt runs/h_teacher_sam45_s1/final.pt runs/h_teacher_aa45/final.pt runs/h_teacher_w40_45/final.pt|data/cache/hard_train2k.npz
+#h_final600_hard|--time=12:00:00|--model resnet_c --epochs 600 @C --val-size 0 --extra-train data/cache/hard_train2k.npz --extra-repeat 3 --teacher runs/h_teacher_sam50/final.pt runs/h_teacher_sam50_s2/final.pt runs/h_teacher_aa50/final.pt runs/h_teacher_w40_50/final.pt|data/cache/hard_train2k.npz
+# Round 9c (Nov 5 03:35 EST): on-the-fly hard augmentation (teacher on the clean image, true-label weight 0.5 on
+# the augmented images); its twin h_ft100_haug and the control run on Colab
+h_ftfinal100_haug|--time=03:00:00|--model resnet_c --epochs 100 --lr 0.02 --warmup-epochs 1 @C --val-size 0 --init runs/h_final800_div/final.pt --hard-aug 0.3 --hard-label-weight 0.5 --teacher runs/h_teacher_sam50/final.pt runs/h_teacher_sam50_s2/final.pt runs/h_teacher_aa50/final.pt runs/h_teacher_w40_50/final.pt|
+# Round 9d (Nov 5 05:20 EST): the fixed hard set did not help (twin hard mean 88.0 vs control 88.1), on-the-fly
+# augmentation did (93.1), so the from-scratch pair uses --hard-aug instead (div recipe, 600 epochs)
+h_fm600_haug|--time=12:00:00|--model resnet_c --epochs 600 @C --hard-aug 0.3 --hard-label-weight 0.5 --teacher runs/h_teacher_sam45/final.pt runs/h_teacher_sam45_s1/final.pt runs/h_teacher_aa45/final.pt runs/h_teacher_w40_45/final.pt|
+h_final600_haug|--time=12:00:00|--model resnet_c --epochs 600 @C --val-size 0 --hard-aug 0.3 --hard-label-weight 0.5 --teacher runs/h_teacher_sam50/final.pt runs/h_teacher_sam50_s2/final.pt runs/h_teacher_aa50/final.pt runs/h_teacher_w40_50/final.pt|
+# Round 9e (Nov 5 12:00 EST): from-scratch hard aug passed its twin (h_fm600_haug fs+bal 97.96 / suite 96.88 = div,
+# hard mean 93.6 vs 88.4), so two Nov 6 follow-ups: Run I's full 800 epochs + hard aug, and a stronger p = 0.5 at 600
+h_fm800_haug|--time=12:00:00|--model resnet_c --epochs 800 @C --hard-aug 0.3 --hard-label-weight 0.5 --teacher runs/h_teacher_sam45/final.pt runs/h_teacher_sam45_s1/final.pt runs/h_teacher_aa45/final.pt runs/h_teacher_w40_45/final.pt|
+h_final800_haug|--time=12:00:00|--model resnet_c --epochs 800 @C --val-size 0 --hard-aug 0.3 --hard-label-weight 0.5 --teacher runs/h_teacher_sam50/final.pt runs/h_teacher_sam50_s2/final.pt runs/h_teacher_aa50/final.pt runs/h_teacher_w40_50/final.pt|
+h_fm600_haug5|--time=12:00:00|--model resnet_c --epochs 600 @C --hard-aug 0.5 --hard-label-weight 0.5 --teacher runs/h_teacher_sam45/final.pt runs/h_teacher_sam45_s1/final.pt runs/h_teacher_aa45/final.pt runs/h_teacher_w40_45/final.pt|
+h_final600_haug5|--time=12:00:00|--model resnet_c --epochs 600 @C --val-size 0 --hard-aug 0.5 --hard-label-weight 0.5 --teacher runs/h_teacher_sam50/final.pt runs/h_teacher_sam50_s2/final.pt runs/h_teacher_aa50/final.pt runs/h_teacher_w40_50/final.pt|
+# Round 10 (Nov 5 14:30 EST): hard aug on Vedant's PreAct 4.98M (the architecture of the 0.901 and Dhanush's 0.904 runs)
+h_fm600_pre_haug|--time=12:00:00|--model preact_v --epochs 600 @C --hard-aug 0.3 --hard-label-weight 0.5 --teacher runs/h_teacher_sam45/final.pt runs/h_teacher_sam45_s1/final.pt runs/h_teacher_aa45/final.pt runs/h_teacher_w40_45/final.pt|
+h_final600_pre_haug|--time=12:00:00|--model preact_v --epochs 600 @C --val-size 0 --hard-aug 0.3 --hard-label-weight 0.5 --teacher runs/h_teacher_sam50/final.pt runs/h_teacher_sam50_s2/final.pt runs/h_teacher_aa50/final.pt runs/h_teacher_w40_50/final.pt|
+# Round 10b (Nov 5 15:00 EST): broader hard aug: + rotation and perspective (haug6); wider levels (haugw)
+h_fm600_haug6|--time=12:00:00|--model resnet_c --epochs 600 @C --hard-aug 0.3 --hard-label-weight 0.5 --hard-factors lowres zoom_in zoom_out background rotate perspective --teacher runs/h_teacher_sam45/final.pt runs/h_teacher_sam45_s1/final.pt runs/h_teacher_aa45/final.pt runs/h_teacher_w40_45/final.pt|
+h_final600_haug6|--time=12:00:00|--model resnet_c --epochs 600 @C --val-size 0 --hard-aug 0.3 --hard-label-weight 0.5 --hard-factors lowres zoom_in zoom_out background rotate perspective --teacher runs/h_teacher_sam50/final.pt runs/h_teacher_sam50_s2/final.pt runs/h_teacher_aa50/final.pt runs/h_teacher_w40_50/final.pt|
+h_fm600_haugw|--time=12:00:00|--model resnet_c --epochs 600 @C --hard-aug 0.3 --hard-label-weight 0.5 --hard-levels wide --teacher runs/h_teacher_sam45/final.pt runs/h_teacher_sam45_s1/final.pt runs/h_teacher_aa45/final.pt runs/h_teacher_w40_45/final.pt|
+h_final600_haugw|--time=12:00:00|--model resnet_c --epochs 600 @C --val-size 0 --hard-aug 0.3 --hard-label-weight 0.5 --hard-levels wide --teacher runs/h_teacher_sam50/final.pt runs/h_teacher_sam50_s2/final.pt runs/h_teacher_aa50/final.pt runs/h_teacher_w40_50/final.pt|

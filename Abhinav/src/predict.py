@@ -12,7 +12,7 @@ import torch
 
 from .data import CLASSES, build_test_loader
 from .models import PARAM_BUDGET, count_params
-from .train import get_device, load_model, tta_probs
+from .train import TTA_CHOICES, get_device, load_model, tta_probs
 
 
 @torch.no_grad()
@@ -67,7 +67,7 @@ def main(argv=None):
     p.add_argument("--ckpt", required=True)
     p.add_argument("--data-dir", default="data")
     p.add_argument("--out", default="submission.csv")
-    p.add_argument("--tta", default="flip", choices=["none", "flip", "flip_shift"],
+    p.add_argument("--tta", default="flip", choices=TTA_CHOICES,
                    help="test-time views averaged per image (see src.train.tta_probs)")
     p.add_argument("--balance", action="store_true",
                    help="class-balanced decoding (balance_probs); approved by the professor on Nov 4")
