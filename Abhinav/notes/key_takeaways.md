@@ -309,6 +309,26 @@ The legitimate top of the leaderboard is about 0.914; the #1 entry at 1.000 is n
       over-predicts automobile (217-221) before balancing.
     - kNN smoothing was not covered by the approval and is not used.
 
+53. **The best decoding is flip_shift TTA (10 views) + balancing at T=1**, chosen as one rule for every model (mean of
+    7 twins, clean / suite): 97.87 / 96.72, against 97.80 / 96.46 for plain flip (what was submitted).
+    - The suite gain holds on all 7 twins (+0.20 to +0.35).
+    - Temperature does not matter (T = 0.1, the near-exact 200-per-class assignment, ties T = 1).
+    - EM prior estimation (no balance assumption) is worse than plain, as expected if the skew comes from the shift.
+
+54. **Switching mixing off at the end does nothing for the FM student**, tested twice.
+    - Colab, F's recipe at 300 epochs with mixing off for the last 15: 97.58 / 96.46 vs 97.70 / 96.50.
+    - HPC, `div` at 600 epochs with mixing off for the last 30: 97.86 / 96.82 vs `div`'s 97.96 / 96.88 at 800
+      (McNemar p = 1.0). Train accuracy jumps to about 94% once mixing stops; val does not move.
+    - Vedant's runs use it with hard labels, where it may matter more; under FM the teacher already gives clean
+      targets.
+
+55. **Round 8: no one-factor change to the `div` recipe beats it** (600-epoch twins, fs + bal vs `div`'s 97.96 / 96.88
+    at 800): mix-off 97.86 / 96.82, KD temperature 1 97.90 / 96.78, DIST 97.76 / 96.61 (the worst suite).
+    - DIST's softmax gives Sinkhorn little to work with: balancing moved 35 hidden predictions, against 58-86 for KL
+      students, and left 185-218 per class.
+    - The 4.62M FM student is at its ceiling (about 97.9 clean, 96.8 suite with balancing); the submission choice is
+      now about decoding and hedging, not training.
+
 ## 10. Ideas for the next round (ranked by expected value per compute unit)
 
 Phase 3 moved the bottleneck from the teacher to the student, so student-side ideas come first. Teachers already

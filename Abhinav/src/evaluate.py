@@ -23,7 +23,7 @@ import numpy as np
 import torch
 
 from .data import build_val_loader
-from .predict import balance_probs
+from .predict import balance_probs, em_prior_probs
 from .train import TeacherEnsemble, evaluate, get_device, load_model, tta_probs
 
 SUITE = {
@@ -89,6 +89,10 @@ def main(argv=None):
     p.add_argument("--no-suite", action="store_true", help="skip the corruption suite")
     p.add_argument("--balance", action="store_true",
                    help="also report class-balanced decoding (src.predict --balance); the val split is class-balanced")
+    p.add_argument("--balance-temps", type=float, nargs="+", default=[1.0],
+                   help="temperatures for --balance, one row each (src.predict --balance-temp)")
+    p.add_argument("--em-prior", action="store_true",
+                   help="also report EM prior estimation (em_prior_probs), which does not assume balanced classes")
     p.add_argument("--num-workers", type=int, default=2)
     args = p.parse_args(argv)
 
@@ -113,7 +117,11 @@ def main(argv=None):
         for tta in args.tta:
             probs, labels = predict(model, clean, device, use_amp, tta)
             right = probs.argmax(1) == labels
-            if args.balance:  # keep the suite's probabilities so they can be decoded both ways
+            decoders = [(f"  + balanced T={t:g}", lambda q, t=t: balance_probs(q, temp=t))
+                        for t in args.balance_temps] if args.balance else []
+            if args.em_prior:
+                decoders.append(("  + EM prior", em_prior_probs))
+            if decoders:  # keep the suite's probabilities so they can be decoded several ways
                 suite_out = [predict(model, loader, device, use_amp, tta) for loader in suite.values()]
                 acc = [100 * (q.argmax(1) == y).float().mean().item() for q, y in suite_out]
             else:
@@ -121,10 +129,10 @@ def main(argv=None):
             line = f"{name[-34:]:<34} {tta:<10} {100 * right.float().mean():6.2f} "
             line += (f"{np.mean(acc):6.2f} {min(acc):6.2f} | " + " ".join(f"{a:8.2f}" for a in acc)) if acc else ""
             print(line, flush=True)
-            if args.balance:
-                bal = lambda q, y: 100 * (balance_probs(q.numpy()).argmax(1) == y.numpy()).mean()  # noqa: E731
-                bacc = [bal(q, y) for q, y in suite_out]
-                line = f"{'  + balanced':<34} {tta:<10} {bal(probs, labels):6.2f} "
+            for label, decode in decoders:
+                dacc = lambda q, y: 100 * (decode(q.numpy()).argmax(1) == y.numpy()).mean()  # noqa: E731
+                bacc = [dacc(q, y) for q, y in suite_out]
+                line = f"{label:<34} {tta:<10} {dacc(probs, labels):6.2f} "
                 line += (f"{np.mean(bacc):6.2f} {min(bacc):6.2f} | " + " ".join(f"{a:8.2f}" for a in bacc)) if bacc else ""
                 print(line, flush=True)
             if "baseline" in others:

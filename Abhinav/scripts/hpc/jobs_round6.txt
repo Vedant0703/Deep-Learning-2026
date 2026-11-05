@@ -26,3 +26,12 @@ h_teacher_aa45_s2||@T --seed 5 --aug autoaugment|runs/h_teacher_w40_50/final.pt
 h_teacher_aa50_s2||@T --seed 5 --aug autoaugment --val-size 0|runs/h_teacher_w40_50/final.pt
 h_teacher_w40aa45|--time=12:00:00|--model wrn40_10 --epochs 300 --ema 0.999 --label-smoothing 0 --sam-rho 0.05 --seed 6 --aug autoaugment|runs/h_teacher_w40_50/final.pt
 h_teacher_w40aa50|--time=12:00:00|--model wrn40_10 --epochs 300 --ema 0.999 --label-smoothing 0 --sam-rho 0.05 --seed 6 --aug autoaugment --val-size 0|runs/h_teacher_w40_50/final.pt
+# Round 8 (Nov 4 13:10 EST): one-factor arms on the div recipe, 600 epochs, twin + final each
+h_fm600_mixoff|--time=12:00:00|--model resnet_c --epochs 600 @C --mix-off-epochs 30 --teacher runs/h_teacher_sam45/final.pt runs/h_teacher_sam45_s1/final.pt runs/h_teacher_aa45/final.pt runs/h_teacher_w40_45/final.pt|
+h_final600_mixoff|--time=12:00:00|--model resnet_c --epochs 600 @C --mix-off-epochs 30 --val-size 0 --teacher runs/h_teacher_sam50/final.pt runs/h_teacher_sam50_s2/final.pt runs/h_teacher_aa50/final.pt runs/h_teacher_w40_50/final.pt|
+h_fm600_dist|--time=12:00:00|--model resnet_c --epochs 600 @C --kd-loss dist --kd-alpha 0.67 --teacher runs/h_teacher_sam45/final.pt runs/h_teacher_sam45_s1/final.pt runs/h_teacher_aa45/final.pt runs/h_teacher_w40_45/final.pt|
+h_final600_dist|--time=12:00:00|--model resnet_c --epochs 600 @C --kd-loss dist --kd-alpha 0.67 --val-size 0 --teacher runs/h_teacher_sam50/final.pt runs/h_teacher_sam50_s2/final.pt runs/h_teacher_aa50/final.pt runs/h_teacher_w40_50/final.pt|
+h_fm600_pre|--time=12:00:00|--model preact_v --epochs 600 @C --teacher runs/h_teacher_sam45/final.pt runs/h_teacher_sam45_s1/final.pt runs/h_teacher_aa45/final.pt runs/h_teacher_w40_45/final.pt|
+h_final600_pre|--time=12:00:00|--model preact_v --epochs 600 @C --val-size 0 --teacher runs/h_teacher_sam50/final.pt runs/h_teacher_sam50_s2/final.pt runs/h_teacher_aa50/final.pt runs/h_teacher_w40_50/final.pt|
+h_fm600_t1|--time=12:00:00|--model resnet_c --epochs 600 @C --kd-temp 1 --teacher runs/h_teacher_sam45/final.pt runs/h_teacher_sam45_s1/final.pt runs/h_teacher_aa45/final.pt runs/h_teacher_w40_45/final.pt|
+h_final600_t1|--time=12:00:00|--model resnet_c --epochs 600 @C --kd-temp 1 --val-size 0 --teacher runs/h_teacher_sam50/final.pt runs/h_teacher_sam50_s2/final.pt runs/h_teacher_aa50/final.pt runs/h_teacher_w40_50/final.pt|

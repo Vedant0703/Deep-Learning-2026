@@ -1609,3 +1609,163 @@ toward 98.3-98.6.
 - **The user's decision:** submit the balanced Run I (`runs/h_final800_div/submission_flip_bal.csv`) right after the
   19:00 EST slot reset, keeping today's last slot free for teammates. It is a clean A/B against Run I (0.900): only the
   70 balanced predictions differ.
+- **12:30 EST: everything is shared on GitHub for the team.** Branch `abhinav` of `Vedant0703/Deep-Learning-2026`,
+  commit `01aef2a`.
+  - `Abhinav/submissions/Abhinav_Run-{D,E,F,G,H,I}/` and `candidates/{Abhinav_1600-epochs,Abhinav_ens3,
+    Abhinav_sam-teacher}/`, each with:
+    - `model.pt`;
+    - the submitted `submission.csv` (D/E regenerated from their checkpoints; regeneration reproduces F's file byte
+      for byte);
+    - `submission_balanced.csv`;
+    - logs and `twin/`;
+    - a README with scores and the exact command.
+  - Also `scripts/hpc/`, logs of every HPC run (`runs/h_*`, pulled as one JSON bundle through the browser because the
+    babysitter's node died at 10:40 EST), and the latest `src/` and notes.
+  - Teacher weights (146-224 MB) exceed GitHub's 100 MB limit and stay on the HPC.
+- **12:45 EST: Round 8, the push before the 19:00 reset** (the user: train new approaches, add prediction-time
+  class-prior variants, pick the top 2-3 together, then submit).
+  - **Teammates' work:** Vedant's `origin/main` has 3 notebooks.
+    - Model: PreAct 4.98M, 59/118/236 channels, 4-4-4 blocks.
+    - Recipe: TrivialAugment + erasing, MixUp/CutMix with hard labels, EMA, flip TTA.
+    - Runs A-D scored 0.875 / 0.892 / 0.881 / 0.895.
+    - The one new idea: mixing OFF for the last 15 of 300 epochs.
+    - His CSVs disagree with ours on 102-147 hidden images. Dhanush has no project code on GitHub.
+  - **Training arms** (`runs/jobs.txt`, all on the `div` 4-teacher recipe, 600 epochs, twin + final):
+    1. `mixoff`: `--mix-off-epochs 30`.
+    2. `dist`: `--kd-loss dist --kd-alpha 0.67`.
+    3. `pre`: `--model preact_v`.
+    4. `t1`: `--kd-temp 1`.
+  - **Job submission:** the babysitter died, so Jupyter 22754 (CPU) was launched to `sbatch` it again.
+  - **Prediction-time variants added:**
+    - `balance_probs(..., temp)` is now log-domain Sinkhorn on p^(1/T). T=1 matches the old version to 3e-15; T→0
+      gives the exact-count assignment (T=0.05: 198-202 per class).
+    - `em_prior_probs`: Saerens et al. EM prior estimation. On a skewed toy it amplifies the skew (275 → 350), as
+      expected.
+    - Flags: `src.predict --balance-temp`, `src.evaluate --balance-temps ... --em-prior`.
+    - The sweep on 7 twins (flip + flip_shift) is running.
+- **13:10 EST: HPC job submission restored.**
+  - Jupyter sessions: 22754 (CPU) failed its boot after 13 min; 22767 (CPU) was held with "user env retrieval
+    failed"; 22766 (A100) sat pending on Priority; 22776 (CPU) came up on b-10-83.
+  - From its terminal (API + websocket):
+    - babysitter v3 resubmitted (22780);
+    - 22766 and 22767 cancelled;
+    - the 8 Round 8 jobs submitted directly with the babysitter's own `@C` expansion: `h_fm600_*` /
+      `h_final600_*` for `mixoff`, `dist`, `pre`, `t1` = 22781-22788. Their `.count` files are set to 1.
+    - All 8 are pending on (Resources): the cloud nodes are being provisioned.
+  - **Colab hedge** (16.87 units, A100): `c_fm300_mixoff` (twin, `teacher_wrn300`) and `c_final300_mixoff`
+    (`teacher50`, all 50k) are running.
+    - Recipe: Run F's exactly, plus `--mix-off-epochs 15` (Vedant's 15/300).
+    - It is a clean one-factor test against `r1_fm` (97.66 / 97.78). Done about 14:40.
+- **13:25 EST: the teachers are shared as a GitHub release** (the user chose a public release after being told the
+  repo is public): <https://github.com/Vedant0703/Deep-Learning-2026/releases/tag/teachers-v1> (tag `teachers-v1` on
+  `abhinav`).
+  - `teacher_wrn300.pt` (45k, val 97.96 / 97.90) and `teacher50.pt` (all 50k), 146,039,914 bytes each.
+  - MD5s match the HPC copies (`0af9a616…`, `929e4ba0…`). The notes give the recipe, the runs each teacher fed, and
+    how to load and distil.
+  - HPC: babysitter 22780 is running; the 8 Round 8 jobs are pending on Priority.
+- **The user's direction (13:30):** do not shorten any run. Submit any time after 19:00, once the best candidates are
+  ready; optimise for the best result, not the clock. Every Round 8 arm keeps its full 600 epochs, and the pending
+  ones run whenever they get GPUs.
+- **13:55 EST: decoding sweep done** (7 twins × {flip, flip_shift} × {plain, Sinkhorn T=2/1/0.5/0.25/0.1, EM};
+  `scratchpad/decode_sweep.log`).
+
+  | Decoding (mean over 7 twins) | clean val | suite mean |
+  |---|---|---|
+  | flip, plain (what was submitted so far) | 97.80 | 96.46 |
+  | flip + balanced T=1 | 97.82 | 96.62 |
+  | flip_shift, plain | 97.89 | 96.53 |
+  | **flip_shift + balanced T=1** | **97.87** | **96.72** |
+  | flip_shift + balanced T=0.1 (about exact 200 per class) | 97.87 | 96.70 |
+  | EM prior (Saerens) | ≈ plain | 96.40 / 96.47 (worse, as expected) |
+
+  - **Chosen for every candidate: flip_shift TTA + balancing at T=1.** It is +0.07 clean and +0.26 suite vs what was
+    submitted.
+    - The suite gain holds for all 7 models (+0.20 to +0.35).
+    - Temperature doesn't matter (±0.02), and the exact-count version ties.
+  - Per twin (fs + bal): `div` 97.96 / 96.88 (best suite), `h_fm800` 97.98 / 96.79, ens3 97.90 / 96.81, sam
+    97.90 / 96.82, 1600 97.88 / 96.77, F's twin 97.70 / 96.50, G's 97.78 / 96.48.
+  - **CSVs:** `runs/{h_final800_div,h_final800,h_final800_ens3,h_final1600,h_final800_sam,r2_final_H,r2_final_S}/
+    submission_fs_bal.csv`. Each changes 58-86 predictions by balancing and has 195-207 per class.
+  - I-fs-bal vs the submitted Run I: 81 predictions differ (vs I-flip-bal: 27). Pairwise disagreement between
+    fs-bal candidates is 62-94.
+  - **HPC:** `mixoff` twin 81/600 (val 95.62, done about 16:35); final 73/600 (done about 16:55). `dist` twin went
+    back to pending after a failed boot; dist / pre / t1 are pending on Priority.
+- **14:25 EST: the Colab mix-off test (Run F's recipe + `--mix-off-epochs 15`, 300 epochs) is a tie, not adopted.**
+
+  | Model | val flip | suite mean flip | fs + bal (clean / suite) |
+  |---|---|---|---|
+  | `c_fm300_mixoff` | 97.62 | 96.31 | 97.58 / 96.46 |
+  | `r1_fm` | 97.78 | 96.28 | 97.70 / 96.50 |
+
+  - McNemar p = 0.36 (flip) and 1.0 (fs + bal).
+  - Train accuracy jumps to 93.6% once mixing stops, but val does not move. Finishing on clean images does not help
+    the FM student, which tempers expectations for the HPC `mixoff` arm.
+  - Colab session stopped; 9.28 units left. Runs saved in `runs/c_fm300_mixoff`, `runs/c_final300_mixoff`.
+- **14:35 EST HPC:** `mixoff` twin 232/600 (val 96.80, done about 16:25); final 211/600 (done about 16:40).
+  - dist / pre / t1 are pending on Priority (each has a `train.log` header but no epochs; an earlier start was cut
+    short).
+  - Jupyter 22776 is gone (preempted). The babysitter resubmitted itself as 22810 and is running, so the queue is
+    covered.
+- **16:45 EST: the HPC `mixoff` twin (`div` recipe at 600 epochs + `--mix-off-epochs 30`) ties `div`; not adopted.**
+
+  | Model (twin) | val none / flip | suite mean flip | fs + bal (clean / suite) | McNemar vs `div` (flip / fs) |
+  |---|---|---|---|---|
+  | `h_fm600_mixoff` | 97.76 / 97.84 | 96.65 | 97.86 / 96.82 | 28 vs 27, p = 1.0 / 21 vs 22, p = 1.0 |
+  | `h_fm800_div` | 97.92 / 97.82 | 96.62 (bal) | 97.96 / 96.88 | baseline |
+
+  - It matches `div` with 25% fewer epochs, but the gain is within noise (rule: +0.15). Second mix-off tie after the
+    Colab one, so finishing on clean images does nothing for the FM student.
+  - The `dist` twin (22783) started booting at 16:42; the queue seems to run two GPU jobs at a time. Expected order:
+    `dist` pair done about 20:15, then `pre`, then `t1` (about 23:45 and 03:15).
+- **19:05 EST: HPC is short of nodes, and `dist` has not started.**
+  - The `dist` and `t1` boots failed (17:00-17:15) and the babysitter resubmitted them: `h_fm600_dist` 22955,
+    `h_fm600_t1` 22956, `h_final600_t1` 22957. `h_final600_dist` 22784 is still pending.
+  - Slurm's estimated starts: `h_final600_dist` 22:44 EST, `h_fm600_dist` 23:23 EST, so done about 02:30-03:00 Nov 5.
+  - Only `h_final600_pre` (22786) is running: 292/600 at 23 s/epoch, done about 21:00. Its twin (22785) is pending,
+    so it can't be validated tonight.
+  - The babysitter is being preempted every 20-40 minutes but resubmits itself each time (now 23038).
+  - Kaggle: a teammate submitted `submission (1).csv` at 23:55 UTC (0.890), the 5th slot of the Nov 4 UTC day. The
+    Nov 5 UTC day (19:00 Nov 4 to 19:00 Nov 5 EST) has all 5 slots free.
+- **21:05 EST: `h_final600_pre` (PreAct 4.98M, `div` recipe, 600 epochs, 50k) is done**, with no twin yet.
+  - `runs/h_final600_pre/submission_fs_bal.csv`: balancing changed 72 predictions; 197-203 per class. It differs from
+    I-fs-bal on 66 hidden images and from G-fs-bal (the same architecture at 300 epochs, 1 teacher) on 91.
+  - `h_final600_dist` (22784) started at about 20:10: 149/600 at 20:57, done about 23:45.
+  - Every twin is pending again after more failed boots (resubmitted as `h_fm600_dist` 23094, `h_fm600_pre` 23095,
+    `h_fm600_t1` 23096, `h_final600_t1` 23097). Without a twin, a final can't be judged.
+  - The OOD session expired (401) at about 21:00. One SSO redirect gave a 400 at `/oidc`; it worked after a retry.
+- **23:45 EST: `h_final600_dist` is done; two twins are finally training.**
+  - `runs/h_final600_dist/submission_fs_bal.csv`: balancing changed only 35 predictions, leaving 185-218 per class
+    (automobile 218, frog 185). The DIST loss matches correlations, not probabilities, so its softmax is a poorer input
+    for Sinkhorn at T=1. It differs from I-fs-bal on 80 hidden images.
+  - The twins run on the same 600-epoch schedule as `h_fm600_mixoff`, which equals the `div` recipe until epoch 570:
+
+    | Twin | Epoch | val (no TTA) | `h_fm600_mixoff` at the same epoch |
+    |---|---|---|---|
+    | `h_fm600_dist` (23094) | 385 | 96.90 | 97.12 |
+    | `h_fm600_t1` (23096) | 454 | 97.30 | 97.46 |
+
+    Both are slightly behind, within single-epoch noise. Expected done: `t1` about 00:30, `dist` about 00:50.
+  - `h_fm600_pre` (23230) and `h_final600_t1` (23231) are still pending.
+- **Nov 5, 01:00 EST: the `t1` and `dist` twins are done; neither beats `div`. Round 8 has no winner so far.**
+
+  | Twin (600 epochs) | val none / flip | flip + bal (clean / suite) | fs + bal (clean / suite) | McNemar vs `div` (fs) |
+  |---|---|---|---|---|
+  | `h_fm800_div` (800) | 97.92 / 97.82 | 97.90 / 96.77 | **97.96 / 96.88** | baseline |
+  | `h_fm600_mixoff` | 97.76 / 97.84 | 97.84 / 96.78 | 97.86 / 96.82 | 21 vs 22, p = 1.0 |
+  | `h_fm600_t1` (`--kd-temp 1`) | 97.76 / 97.92 | 97.94 / 96.75 | 97.90 / 96.78 | 22 vs 24, p = 0.88 |
+  | `h_fm600_dist` (DIST, α 0.67) | 97.54 / 97.82 | 97.80 / 96.55 | 97.76 / 96.61 | 19 vs 30, p = 0.15 |
+
+  - `t1` ties. `dist` is worse on the suite (−0.27), and balancing helps it least (its softmax is poorly calibrated).
+  - Still pending: `h_fm600_pre` (23277) and `h_final600_t1` (23278).
+- **Nov 5, 02:25 EST: submitted Run J (I-bal) and Run K (H-bal) on the user's instruction.** These were the first 2
+  of the Nov 5 UTC quota; 3 remain until 19:00 EST.
+
+  | Run | File | Twin fs + bal (clean / suite) | Public | Same model, plain flip |
+  |---|---|---|---|---|
+  | **J** (ref 58014367) | `runs/h_final800_div/submission_fs_bal.csv` | 97.96 / 96.88 | **0.902** | Run I 0.900 |
+  | K (ref 58014369) | `runs/h_final800/submission_fs_bal.csv` | 97.98 / 96.79 | 0.894 | Run H 0.897 |
+
+  - **The team's best is now 0.902: #21 of 68.** The legit top 5 are 0.918, 0.915, 0.915, 0.914, 0.912.
+  - On the public 1,000, decoding moved I by +2 images and H by −3, net −1 over the pair. Each changes about 80 of
+    2,000 predictions, so about 40 public ones. That is within noise; the public set can't tell whether balancing
+    helps.
