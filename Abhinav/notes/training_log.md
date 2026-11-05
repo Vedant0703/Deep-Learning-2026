@@ -1967,3 +1967,9 @@ images; augmentations of them are allowed; no external data or weights; no evalu
   - Leaderboard: rank 13 of 69 (tied 11-13 at 0.910). The legit top 5 is 0.913-0.918 (two entries at 1.000 / 0.972
     are not credible), so M is 0.3-0.8 points from it.
   - 1 slot left before 19:00 EST.
+- **13:50 EST: Run I's twin on the hard suite with flip_shift** (for like-for-like tables): no balancing, mean 88.78
+  (lowres16 80.42, zoom_out 86.58, bg 82.68). So Run M's twin gains +4.9 on the mean, +14.3 on lowres16, +9.7 on
+  zoom-out and +12.9 on background (all flip_shift).
+- **Team write-up:** `SurveyCorps_CIFAR10_findings_Nov5.pdf` (6 pages: approach, baselines, KD, hard-image
+  augmentation, results, ideas for parallel work, GitHub links), in `Abhinav/reports/` on the `abhinav` branch.
+  Figure 1 comes from `scripts/hard_suite_figure.py`.
