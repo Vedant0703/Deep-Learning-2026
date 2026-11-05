@@ -1973,3 +1973,10 @@ images; augmentations of them are allowed; no external data or weights; no evalu
 - **Team write-up:** `SurveyCorps_CIFAR10_findings_Nov5.pdf` (6 pages: approach, baselines, KD, hard-image
   augmentation, results, ideas for parallel work, GitHub links), in `Abhinav/reports/` on the `abhinav` branch.
   Figure 1 comes from `scripts/hard_suite_figure.py`.
+- **13:34 EST: Dhanush submitted "Run G, single 4.98M PreAct ResNet, 10-view translation + horizontal-flip probability
+  TTA. Twin validation 97.76%. No class balancing." → 0.904** (ref 58032451), the team's third-best score after M
+  0.910 and L 0.906. The letter clashes with Abhinav's Nov 4 Run G (PreAct FM KD, 0.901). Its code is not on GitHub.
+  - That was the 5th team submission of the Nov 5 UTC day (J, K, M, L, G), so no slots remain until 19:00 EST.
+  - Final-pick candidates: M plus L, or plus Dhanush's G (a different architecture, so a more decorrelated hedge).
+  - The team PDF (v2) now credits runs by person (Vedant: A, B and his own Run D 0.895; teammate: C; Abhinav: D-M;
+    Dhanush: the Nov 5 G) and adds Dhanush's result.
