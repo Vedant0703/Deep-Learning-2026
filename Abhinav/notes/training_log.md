@@ -2386,3 +2386,26 @@ images; augmentations of them are allowed; no external data or weights; no evalu
        public can't verify.
      - Beyond today: hidden-set-like robustness over clean accuracy, i.e. hard-aug-trained teachers and more natural
        factors (cat↔dog is about a third of the shared errors).
+- **11:35-11:50 EST:** the three jobs got nodes again (b-19-35/36/43), configured for 14.5 min, then were CANCELLED by 0 (boot failure). Jupyter 25181 died at the same time. Jupyter 25204 (b-9-81) took the lock and ran one pass at 11:55, resubmitting **25206** (`h_final600_pre_haug6`, try 4), **25207** (SAM twin, try 2) and **25208** (SAM final, try 2). All three are pending (Priority).
+- **12:31-13:22 EST:** Jupyter 25204 died at about 12:30, and the Mac slept for about an hour (the Colab VM survived).
+  25206, 25207 and 25208 got nodes at about 13:22 and are **training** (the babysitter is now hosted inside the GPU
+  jobs).
+  - `h_final600_pre_haug6`: 23.7 s/epoch, ETA about 17:20.
+  - `h_fm600_pre_haug_sam`: 26.9 s/epoch (SAM costs 1.24×), ETA about 17:55.
+  - `h_final600_pre_haug_sam`: 30.0 s/epoch, ETA about 18:25.
+  - The SAM pair lands after the 18:00 pick deadline.
+- **14:30 EST: PreAct + 6-factor twin `c_fm600_pre_haug6` (Colab) fails its gate.** The Colab VM was stopped at 14:10.
+
+  | Twin (fs+bal) | Clean | Suite | Hard (fs) | lowres16 | bg | rot20 | persp | ambiguous | vs PreAct + haug | vs M |
+  |---|---|---|---|---|---|---|---|---|---|---|
+  | `h_fm600_pre_haug` (PreAct + haug) | **98.20** | **97.03** | **93.87** | 94.72 | 95.62 | 94.20 | 95.98 | **83.20** | – | 31 vs 19 |
+  | `c_fm600_pre_haug6` | 97.96 | 96.87 | 93.66 | 94.38 | 95.34 | **95.90** | **96.42** | 81.00 | 19 vs 31, p = 0.12 | 27 vs 27, p = 1.0 |
+  | M | 97.96 | 96.88 | 93.68 | 94.74 | 95.58 | 94.22 | 96.02 | 81.80 | – | – |
+
+  - **Gate** (clean ≥ 98.10, hard ≥ 93.87): fails both. It qualifies under rule D but is a tie with M and below
+    PreAct + haug.
+  - **The same trade as on ResNet-C:** rotation +1.7 and perspective +0.4, but lowres and background drop, and it loses
+    PreAct's natural-ambiguity edge (ambiguous 83.2 → 81.0). So the analysis's "stop rotation + perspective" was right.
+  - On random 1k subsets it trails PreAct + haug 75% of the time.
+  - Its final `h_final600_pre_haug6` (HPC 25206) keeps running so it completes (the user wants every run finished),
+    but it is not a pick candidate. **The picks are unchanged: {PreAct + hard aug (0.909), M (0.910)}.**
