@@ -2111,3 +2111,41 @@ images; augmentations of them are allowed; no external data or weights; no evalu
   - Train log: final val 97.76, flip 97.86 (M: 97.80 / 97.94).
   - A stronger p buys +0.1 on the hard suite and costs about 0.1 clean. It misses the clean bar (97.86) by 0.02, so
     under rule D it doesn't qualify. p = 0.3 is about right.
+  - The final `h_final600_haug5` was predicted anyway (`submission_fs_bal.csv`: 69 labels changed by balancing,
+    196-206 per class; differs from M on 71, L on 76, J on 82). A spare, not a pick.
+- **18:38 EST: `h_fm800_haug` (M's recipe, 800 epochs) twin: no gain from longer training.**
+
+  | Twin (fs+bal) | Clean | Suite | Hard mean (fs) | lowres16 | rot20 | McNemar vs M | Jaccard with M |
+  |---|---|---|---|---|---|---|---|
+  | M `h_fm600_haug` (600 ep) | 97.96 | 96.88 | 93.68 | 94.74 | – | – | – |
+  | `h_fm800_haug` (800 ep) | 97.90 | 96.87 | 93.37 | 94.28 | 94.08 | 18 vs 30, p = 0.11 | 0.67 |
+
+  - It passes the bars (clean ≥ 97.86, suite ≥ 96.78, no significant loss) but doesn't beat M, and it is M's family,
+    so rule D gives it no pick. The extra 200 epochs cost 0.3 on the hard suite: 600 epochs is the right length.
+  - Its final `h_final800_haug` (24302) and `h_fm600_pre_haug` (24303) were "CANCELLED by 0" at boot (23:10 UTC).
+    Jupyter 24435 ran one babysitter pass at 23:27 UTC: resubmitted as 24441 / 24442 (attempts 5 and 3). They now sit
+    behind the other 17 pending jobs (lower age priority); nothing else was touched.
+- **18:31 EST: Colab C′ finished** (`c_ftG100_1t_tw` val 97.74 / flip 97.74, vs Run G's twin 97.40 / 97.58).
+  Both runs fetched; the VM is stopped. Colab balance: 0.11 units (no more Colab runs without buying units).
+- **18:54 EST: C′ twin `c_ftG100_1t_tw` (Run G + hard aug + G's own teacher, 100 ep fine-tune):** better than Run G,
+  still below M.
+
+  | Twin | Clean fs | Clean fs+bal | Suite fs+bal | Hard mean (fs) | McNemar vs M | Flip errors | Jaccard with M |
+  |---|---|---|---|---|---|---|---|
+  | M `h_fm600_haug` | 98.00 | 97.96 | 96.88 | 93.68 | – | 103 | – |
+  | C′ `c_ftG100_1t_tw` | 97.80 | 97.78 | 96.65 | 92.88 | 24 vs 34, p = 0.24 | 113 | 0.60 |
+  | Run G `r2_twin_S` | 97.76 | 97.78 | 96.48 | 87.65 | C′ vs G: 24 vs 22, p = 0.88 | 121 | 0.52 |
+
+  - Fails rule D's bars (clean 97.78 < 97.86, suite 96.65 < 96.78), so it can't be Pick 1.
+  - As the PreAct hedge it is more accurate than G (113 vs 121 held-out errors) but less decorrelated from M (0.60
+    vs 0.52): hard aug pulls it toward M.
+  - Final `c_ftG100_1t/submission_fs_bal.csv`: 4,980,392 params, 74 labels changed by balancing, 197-203 per class;
+    differs from M on 82, L on 94, Run G on 69.
+  - **19:12 EST, Run G's twin on the same suite:** C′ ties G on clean (97.78 fs+bal both; McNemar p = 0.88) and
+    gains +0.17 on the corruption suite and **+5.2 on the hard suite** (lowres16 77.8 → 93.5, background 81.4 → 94.3,
+    zoom_out 85.9 → 95.1). The same treatment took Run I to L (+0.4 public).
+  - So C′ dominates Run G as the PreAct hedge on the twin. It replaces G-TTA as the Pick 2 candidate if the team agrees;
+    its public score is only a sanity check (no choosing on gaps < 0.004).
+- **19:05 EST HPC:** all 19 of our jobs pending (Priority) in a congested A100 partition (about 150 jobs); none has
+  started since 18:02. Jupyter 24435 has stopped responding, so until a GPU job starts there is no babysitter;
+  checked by hand every 30-45 min.
