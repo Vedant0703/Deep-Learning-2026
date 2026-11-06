@@ -2200,3 +2200,33 @@ images; augmentations of them are allowed; no external data or weights; no evalu
   - `c_final600_hfw` follows only if the twin qualifies under rule D and its hard mean is ≥ 93.68.
   - If the HPC's own hvd pair is confirmed training first, the Colab duplicates are stopped (user's choice). SSH to
     the VM works for that: `ssh -o ProxyCommand="colab ssh --proxy-mode -s dl1" root@colab-dl1`.
+- **02:50 EST: TTA aggregation check** (local; geometric mean of the 10 views, i.e. mean log-probability, vs the
+  current mean of probabilities; fs+bal). **Fails its pre-registered rule; dropped.**
+
+  | Twin | Probability mean | Log-probability mean | Δ clean / Δ suite |
+  |---|---|---|---|
+  | M | 97.96 / 96.88 | 98.00 / 96.87 | +0.04 / −0.01 |
+  | L `c_ft100_haug` | 97.86 / 96.74 | 97.74 / 96.71 | −0.12 / −0.03 |
+
+  - The rule (the scale-TTA rule) needed clean ≥ +0.04 *and* suite ≥ +0.05 on both twins.
+- **03:15 EST: the HPC hard-view distillation pair is training** (`h_fm600_hvd` epoch 158, `h_final600_hvd` 169, about
+  20 s/epoch, done about 05:45-06:00). As the user chose, the Colab duplicates were stopped by SSH (`kill -TERM` of
+  the main process, exit 143) at epochs 182 / 147; local `last.pt` backups are kept.
+  - The watcher then synced the code and started **`c_fm600_hfw`** (factor-weighted hard aug twin) at 03:18:
+    18.7 s/epoch alone, done about 06:25. Colab balance 73.8.
+- **03:35 EST: `h_fm600_pre_haug` (PreAct-V, M's recipe: FM KD + 4 teachers + hard aug p 0.3, 600 ep) twin.**
+  **The first model to beat M on every twin metric, and the least correlated with M.**
+
+  | Twin (fs+bal) | Clean | Suite | Hard mean (fs) | lowres16 | bg | rot20 | McNemar vs M | Jaccard with M |
+  |---|---|---|---|---|---|---|---|---|
+  | M `h_fm600_haug` | 97.96 | 96.88 | 93.68 | 94.74 | 95.58 | 94.22 | – | – |
+  | **`h_fm600_pre_haug`** | **98.20** | **97.03** | **93.87** | 94.72 | 95.62 | 94.20 | 29 vs 25, p = 0.68 | **0.48** |
+  | PreAct-600 without hard aug | – | – | – | – | – | – | – | 0.63 |
+
+  - Train log: final val 98.06, flip 98.06 (M: 97.80 / 97.94).
+  - **Rule D:** it qualifies (clean ≥ 97.86, suite ≥ 96.78, no significant loss) and beats M on the twin, though not significantly.
+    - It becomes Pick 1 only if its public score is ≥ M − 0.004 (≥ 0.906).
+    - Either way, {M, PreAct-haug} is the natural final pair: the best twin, plus the most decorrelated pair yet
+      (0.48, below Run G's 0.52).
+  - **Final `h_final600_pre_haug`** (50k, T50) finished 03:40. `submission_fs_bal.csv`: 4,980,392 params, 2,000
+    rows, 77 labels changed by balancing, 194-206 per class. It differs from M on 77, L on 75, Run G on 87, C′ on 91.
