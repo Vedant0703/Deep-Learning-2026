@@ -1,0 +1,6 @@
+model                              tta           val   mean  worst |  bright+  bright-   contr+   contr-   sat0.5   sat1.5    sharp     blur noise.02 noise.04   jpeg50
+runs/h_fm600_pre_haug/final.pt     flip_shift  98.08  96.81  86.34 |    98.18    98.08    98.18    98.04    97.92    98.00    97.48    97.76    97.82    97.08    86.34
+  + balanced T=1                   flip_shift  98.20  97.03  88.40 |    98.24    98.04    98.22    98.16    97.96    98.06    97.64    97.64    97.88    97.12    88.40
+  hard suite                       flip_shift         93.87  83.20 | lowres16=94.72 lowres24=96.90 zoom_in1.3=96.68 zoom_out0.7=96.02 rot20=94.20 persp0.4=95.98 bg0.7=95.62 confuse0.7=91.50 ambiguous=83.20
+  hard suite + balanced T=1        flip_shift         92.57  70.20 | lowres16=94.86 lowres24=96.84 zoom_in1.3=96.78 zoom_out0.7=96.22 rot20=94.76 persp0.4=96.14 bg0.7=95.66 confuse0.7=91.64 ambiguous=70.20
+                                              vs runs/h_fm600_haug/final.pt: only this right 29, only baseline right 25, McNemar p=0.683

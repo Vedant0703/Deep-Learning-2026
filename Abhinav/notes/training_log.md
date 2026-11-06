@@ -2281,3 +2281,83 @@ images; augmentations of them are allowed; no external data or weights; no evalu
 
 - **Final pair:** {M, PreAct + hard aug}. Which is Pick 1 depends on PreAct's public score: it is Pick 1 if its
   public is ≥ 0.906 (M − 0.004), otherwise Pick 2. Its submission waits for the user's OK.
+
+## Round 13 (Nov 6, 09:50 EST): PreAct-V + 6-factor hard aug on Colab
+
+- **State:** nothing was training (Colab stopped 06:43; no HPC jobs; `h_final600_hvd` reached 600/600, not a
+  candidate). The user asked not to submit; the team will pool its best models and pick together. Training continues.
+- **Status of the outside analysis's proposals:** #5 PreAct-V with M's recipe = our best model (`h_fm600_pre_haug`);
+  #3 factor weights (`c_fm600_hfw`) failed the clean bar, so its final was skipped; #4 severity-aware soft targets
+  ≈ hard-view distillation (`hvd`), below M; scale TTA and log-probability TTA failed their rule; #2 exact quotas,
+  #6 AugMix JSD and #7 hard-trained teachers were not run (rules risk, redundant, too slow).
+- **Run:** `c_fm600_pre_haug6` (twin, T45) = `h_fm600_pre_haug`'s flags + `--hard-factors lowres zoom_in zoom_out
+  background rotate perspective` (the haug6 change, which on ResNet-C tied M overall but fixed its worst factor:
+  rot20 94.22 → 96.02). PreAct is about 21.5 s/epoch alone, so the twin takes about 3.5 h (done about 13:30).
+- **Pre-registered gate for the final** `c_final600_pre_haug6` (same flags, `--val-size 0`, T50): it qualifies under
+  rule D (clean ≥ 97.86, suite ≥ 96.78, no significant McNemar loss vs M) **and** is not worse than the PreAct + hard
+  aug twin: hard mean ≥ 93.87 and clean ≥ 98.10 (fs+bal). Otherwise no final. A final started at about 13:40 lands
+  about 17:15 on Colab.
+- **09:35 EST: the user approved the HPC for the final** ("without disrupting anything already in the queue").
+  - Queue check first: no jobs were queued; the only `runs/jobs.txt` line without `final.pt` is `h_final600_t1`, at
+    its attempt cap (count 99), so no babysitter pass resubmits anything else. `runs/inbox/` was empty.
+  - Appended `h_final600_pre_haug6` (`--time=06:00:00`, same flags as the twin + `--val-size 0`, T50) to
+    `runs/jobs.txt` and submitted it directly: job **25074**, pending (Resources).
+  - Boot-failure cover until a GPU job hosts the babysitter: OOD Jupyter 25071 (`interactive`, 2 h, b-9-19) runs a
+    `BABYSIT_ONCE=1` pass every 5 min under the same `runs/babysit/host` lock as `train.sbatch` (host id `jup25071`).
+  - The final is used only if the Colab twin passes the gate above.
+
+## Round 13b (Nov 6, 10:15 EST): review of the second outside analysis ("Round 11: new approaches")
+- **Verdicts** (full table in the plan): run the TTA re-check on PreAct and the paired / subset analysis (free), and
+  student SAM on PreAct (the only proposal with zero new code). Skip JSD consistency (redundant with the teachers'
+  clean-view target), SupCon and MixStyle (new code, no time for twin + final), training-set disagreement mining
+  (Round 1 step 0: students reproduce teachers on 100% of training images, so there is nothing to mine), and
+  balancing-strength tuning (only Sinkhorn T = 1 is approved).
+- The analysis's "teacher-uncertain 500 images" diagnostic is our hard suite's `ambiguous` row: PreAct 83.2 vs M
+  81.8 (fs), while the synthetic factors are level (lowres16 94.72 / 94.74, bg 95.62 / 95.58, rot20 94.20 / 94.22).
+  PreAct's edge is natural ambiguity, not synthetic robustness, so the 6-factor PreAct run is no longer the main bet.
+- **10:25 EST: paired PreAct twin vs M twin** (`scratchpad/paired.py`, 5k held-out):
+
+  | Decoding | PreAct / M | Both wrong | Only PreAct right | Only M right | McNemar p | Jaccard |
+  |---|---|---|---|---|---|---|
+  | fs+bal (submission) | 98.20 / 97.96 | 71 | 31 | 19 | 0.12 | 0.59 |
+  | fs | 98.08 / 98.00 | 71 | 29 | 25 | 0.68 | 0.57 |
+
+  - The balanced gain is not significant (p = 0.12). Without balancing the two are level, so balancing helps PreAct
+    more than M. (The earlier 0.48 Jaccard was flip TTA.)
+  - **Cat ↔ dog** is 23 of the 71 shared errors. PreAct fixes 13 of M's cat/dog errors but makes 12 of its own,
+    so its net gain is outside cat/dog: airplane 3, automobile 2, deer 2, horse 2.
+  - **Public-sized samples:** on 10,000 random 1,000-image subsets of the held-out set, PreAct leads in 75%, ties in
+    10% and trails in 15%. The gap's 5-95% range is −0.2 to +0.7 points. The hidden set has about 4× the error rate,
+    so the public gap is noisier still. **Public can't settle PreAct vs M.**
+- **Student SAM pair on the HPC:** `h_fm600_pre_haug_sam` / `h_final600_pre_haug_sam` (PreAct + hard aug +
+  `--sam-rho 0.05`). The local smoke test passed (`--subset 512`, 1 epoch). The submission was blocked by the
+  session's permission check (shared-cluster change), so it waits for the user.
+- **10:31 EST: Colab twin `c_fm600_pre_haug6` training** (21.7 s/epoch, done about 14:10).
+  - The first launch script hung: the teacher uploads outlasted the supervisor's 30-min idle exit, and the restarted
+    supervisor held the script's output pipe. It was killed and relaunched without pipes (`scratchpad/colab_r13b.sh`).
+- **HPC final `h_final600_pre_haug6`:** 25074 and 25089 were "CANCELLED by 0" at boot (about 14 min each); 25111 is
+  pending. Jupyter 25071 (with the resubmit loop) died at about 10:25, so Jupyter 25137 (b-9-45) hosts the loop now
+  (host id `jup25137`).
+- **10:45 EST: the user approved the student-SAM pair:** `h_fm600_pre_haug_sam` (25142) and
+  `h_final600_pre_haug_sam` (25143). Both are pending and appended to `runs/jobs.txt` (count 1). Same gate as haug6:
+  the twin must clear rule D and clean ≥ 98.10 and hard ≥ 93.87.
+- **11:20 EST: TTA variants on the two PreAct twins (fs+bal; Δ clean / Δ suite vs the current fs+bal). All fail the
+  pre-registered rule (clean ≥ +0.04 and suite ≥ +0.05 on both). The decoding stays fs+bal.**
+
+  | Variant | `h_fm600_pre_haug` (98.20 / 97.03) | `h_fm600_pre` (97.94 / 96.74) |
+  |---|---|---|
+  | D: 14 views (`flip_shift_scale`) | 98.14 / 97.10 (−0.06 / +0.07) | 97.84 / 96.76 (−0.10 / +0.02) |
+  | F: log-probability mean | 98.20 / 96.99 (0.00 / −0.04) | 97.94 / 96.75 (0.00 / +0.01) |
+  | E: unshifted views ×2 (`scratchpad/eval_wtta.py`) | 98.16 / 97.02 (−0.04 / −0.01) | 97.96 / 96.74 (+0.02 / 0.00) |
+
+- **HPC queue (10:55-11:20 EST):** 25111, 25142 and 25143 are all pending with reason Priority. The A100 partition
+  has 10 running and 40 pending, and our fair-share is 0.010 (the lowest; 176 GPU-h used).
+  - `squeue --start` estimates 21:52-22:59 EST; `sbatch --test-only` for a new job estimates 12:29 EST.
+  - Jupyter 25137 ended at about 11:15, so Jupyter 25181 was launched for the resubmit loop.
+- **11:21-11:30 EST:** 25111, 25142 and 25143 got nodes (b-19-39/40/41), configured for 9 min, then were REQUEUED by Slurm (boot failure). They kept the same IDs and are pending again. Since Nov 5 we have had 101 boot failures and 34 successful runs, on the same b-19 nodes, so this is random cloud boot failure, not bad nodes.
+- **11:34 EST: submitted PreAct + hard aug (`h_final600_pre_haug`, Run N) with the user's OK. Public 0.909** (ref
+  58063597; M 0.910). The −0.001 gap is 1 image of the public 1,000, well inside the 1k-subset range (−0.2 to +0.7).
+  - **Rule D:** PreAct beats M on the twin and its public is ≥ M − 0.004 (0.906), so it is Pick 1, with M as Pick 2.
+  - The pair is the same either way: {PreAct + hard aug, M}. Kaggle scores the better of the two on private.
+  - The team had 4 submissions left today.
+- **11:34 EST: HPC jobs 25111, 25142 and 25143 are pending again** (Priority) after the requeue.
