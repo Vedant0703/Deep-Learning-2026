@@ -182,11 +182,12 @@ HARD_LEVELS = {
 }
 
 
-def hard_batch(x, p, factors, mean, std, levels="default"):
+def hard_batch(x, p, factors, mean, std, levels="default", weights=None):
     """On-the-fly hard augmentation of a normalized training batch, on its device: a random fraction p of the images
     gets one random factor from `factors` (ALL_BATCH_FACTORS), with one level per factor per batch drawn from
-    HARD_LEVELS[levels]. Background partners are other images of the same batch; rotations get a random sign and
-    perspective warps random corner offsets per image. Returns (batch, bool mask of changed images)."""
+    HARD_LEVELS[levels]. Factors are equally likely, or drawn with probabilities `weights` (one per factor).
+    Background partners are other images of the same batch; rotations get a random sign and perspective warps
+    random corner offsets per image. Returns (batch, bool mask of changed images)."""
     n = x.shape[0]
     mask = torch.rand(n, device=x.device) < p
     if not mask.any():
@@ -195,7 +196,10 @@ def hard_batch(x, p, factors, mean, std, levels="default"):
     s = torch.tensor(std, device=x.device).view(1, 3, 1, 1)
     img = (x * s + m).clamp(0, 1)
     out = img.clone()
-    which = torch.randint(len(factors), (n,), device=x.device)
+    if weights is None:
+        which = torch.randint(len(factors), (n,), device=x.device)
+    else:
+        which = torch.multinomial(torch.tensor(weights, dtype=torch.float, device=x.device), n, replacement=True)
     partner = img[torch.randperm(n, device=x.device)]
     for k, name in enumerate(factors):
         sel = mask & (which == k)

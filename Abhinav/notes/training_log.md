@@ -2149,3 +2149,54 @@ images; augmentations of them are allowed; no external data or weights; no evalu
 - **19:05 EST HPC:** all 19 of our jobs pending (Priority) in a congested A100 partition (about 150 jobs); none has
   started since 18:02. Jupyter 24435 has stopped responding, so until a GPU job starts there is no babysitter;
   checked by hand every 30-45 min.
+- **Nov 6, 00:35 EST.** The user bought 100 Colab units (balance 100.11).
+  - **HPC came back:** a batch of A100 nodes freed at about 22:58 EST. The GPU-hosted babysitter worked: at 03:58-04:13 UTC it resubmitted the 8 jobs cancelled at boot.
+    - Done: `s_tw_a/b/c`, `s_fn_a/b/c` (soup ingredients; e.g. `s_tw_a` final val 97.46, flip 97.72) and `h_ftG100_haug` (C, full data).
+    - Running: `h_fm600_pre_haug`, `h_final600_pre_haug`, `h_final600_haug6`, `h_final800_haug`, `h_fm600_haugw`.
+    - Booting: `s_tw_d`, `s_fn_d`, `h_ftG100_haug_tw`, `h_fm600_haug6`, `h_final600_haugw`, `h_fm600_hvd`, `h_final600_hvd`.
+  - **Colab A100 as insurance** for the jobs the HPC had not started (same flags as `runs/jobs.txt`; local script `colab_r11.sh`):
+    - `c_s_tw_d`, `c_s_fn_d`, `c_fm600_hvd`, `c_final600_hvd`, all four on one A100 at about 38 s/epoch each with two running;
+    - the full-data teachers T50 were downloaded from the HPC first.
+  - **Partial-soup sanity check:** M + `s_tw_a/b/c`, BN recalibrated, scores flip 97.76 / suite 96.46, vs M 97.94 / 96.58.
+    - This is a check only, not a selection: the composition stays the pre-registered M + a-d.
+    - The ingredients drift below M during the lr-0.02 restart, and averaging doesn't recover it, so the soup is unlikely to beat M.
+- **02:25 EST: twin soup `soup_twin`** (uniform average of M + `s_tw_a/b/c` + `c_s_tw_d`, BN recalibrated on 50
+  training batches): **no gain.**
+
+  | Twin (fs+bal) | Clean | Suite | Hard mean (fs) | McNemar vs M | Jaccard with M |
+  |---|---|---|---|---|---|
+  | M | 97.96 | 96.88 | 93.68 | – | – |
+  | `soup_twin` | 97.88 | 96.83 | 93.40 | 12 vs 21, p = 0.16 | 0.74 |
+
+  - It passes the bars but doesn't beat M, and it is M's family with the most correlated errors so far (0.74). Rule D gives it no pick.
+  - Ingredient `c_s_tw_d` (wide levels): final val 97.74, flip 97.84.
+  - The final soup is still built (pre-registered) once `c_s_fn_d` lands, as a spare.
+
+## Round 12 (Nov 6, 02:00 EST): review of an outside "reach 92%" analysis
+- Plan: `~/.claude/plans/the-high-level-goal-rosy-star.md`. User constraints: Colab only (no HPC changes), new
+  runs after the current Colab work, in priority order.
+- **Kept:** factor-weighted hard aug (#3), with weights from M's twin hard-suite excess error over clean:
+  - lowres 0.35, zoom_in 0.15, zoom_out 0.20, background 0.30;
+  - not the proposal's 35/10/30/25, which starves zoom_in, still at 3.6% error.
+- **Dropped, with reasons:**
+  - scale TTA: already failed its pre-registered rule;
+  - exact-quota assignment: moves only about 5-10 labels, and relies on an external-dataset guess; only Sinkhorn is approved;
+  - severity-aware soft targets: subsumed by hard-view distillation, which is running;
+  - clean/hard consistency: redundant with clean-view KD;
+  - hard-trained teachers: too costly;
+  - the 800-epoch and p 0.5 runs: done, no gain;
+  - PreAct + M's recipe: agreed, already running on the HPC.
+- **Corrected one claim:** M's rot20 (94.22) is its worst single-factor row, so rotation is *not* "handled well".
+- **Code checks:**
+  - KD is KL × T² (`distillation_loss`);
+  - TTA averages probabilities;
+  - final class counts are 196-206.
+- **`--hard-factor-weights`** (`src/train.py`) → `hard_batch(..., weights)` (`src/hard.py`):
+  - With `weights=None`, the output is bit-identical to the old code (6 seeded batches, both factor sets).
+  - 200k draws match the weights within 0.0003.
+  - The 1-epoch MPS smoke test records the weights in `config.json`; a weight-count mismatch is rejected.
+- **Colab queue** (watcher `colab_r12_watch.sh`):
+  - `c_fm600_hfw` starts when `c_fm600_hvd` and `c_final600_hvd` are fetched;
+  - `c_final600_hfw` follows only if the twin qualifies under rule D and its hard mean is ≥ 93.68.
+  - If the HPC's own hvd pair is confirmed training first, the Colab duplicates are stopped (user's choice). SSH to
+    the VM works for that: `ssh -o ProxyCommand="colab ssh --proxy-mode -s dl1" root@colab-dl1`.

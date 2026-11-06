@@ -74,6 +74,9 @@ def get_args(argv=None):
                    help="fraction of each batch given a random hard factor (src.hard.hard_batch) on the GPU, after the "
                         "teacher has seen the clean image (0 = off)")
     p.add_argument("--hard-factors", nargs="+", default=list(BATCH_FACTORS), choices=ALL_BATCH_FACTORS)
+    p.add_argument("--hard-factor-weights", nargs="+", type=float, default=None,
+                   help="sampling probability of each --hard-factors entry, in the same order (normalized); "
+                        "default: equally likely")
     p.add_argument("--hard-levels", default="default", choices=sorted(HARD_LEVELS),
                    help="level ranges for --hard-aug (src.hard.HARD_LEVELS); 'wide' reaches smaller, blurrier objects")
     p.add_argument("--hard-teacher", default=None,
@@ -234,7 +237,8 @@ def add_pixel_noise(x, max_std, p=0.5):
 def train_one_epoch(model, loader, criterion, optimizer, scheduler, scaler, device, use_amp, mixer, mix_prob,
                     ema=None, teacher=None, kd_alpha=0.0, kd_temp=1.0, student_noise=0.0,
                     kd_loss=distillation_loss, sam_rho=0.0, hard_aug=0.0, hard_factors=BATCH_FACTORS,
-                    hard_label_weight=None, hard_levels="default", hard_teacher=None, hard_teacher_weight=0.5):
+                    hard_label_weight=None, hard_levels="default", hard_teacher=None, hard_teacher_weight=0.5,
+                    hard_factor_weights=None):
     model.train()
     params = [p for p in model.parameters() if p.requires_grad]
     loss_sum = torch.zeros((), device=device)
@@ -257,7 +261,8 @@ def train_one_epoch(model, loader, criterion, optimizer, scheduler, scaler, devi
         xs = add_pixel_noise(x, student_noise) if student_noise > 0 else x
         hard = None
         if hard_aug > 0:  # after the teacher, so it labels the clean image
-            xs, hard = hard_batch(xs, hard_aug, hard_factors, CIFAR10_MEAN, CIFAR10_STD, hard_levels)
+            xs, hard = hard_batch(xs, hard_aug, hard_factors, CIFAR10_MEAN, CIFAR10_STD, hard_levels,
+                                  hard_factor_weights)
             if device.type == "cuda":
                 xs = xs.contiguous(memory_format=torch.channels_last)
             if hard_teacher is not None and teacher_out is not None and hard.any():
@@ -470,6 +475,11 @@ def main(argv=None):
 
     kd_loss = dist_loss if args.kd_loss == "dist" else distillation_loss
     assert args.hard_label_weight is None or args.kd_loss == "kl", "--hard-label-weight needs --kd-loss kl"
+    hard_factor_weights = None
+    if args.hard_factor_weights is not None:
+        assert len(args.hard_factor_weights) == len(args.hard_factors) and min(args.hard_factor_weights) >= 0, \
+            "--hard-factor-weights needs one non-negative weight per --hard-factors entry"
+        hard_factor_weights = [w / sum(args.hard_factor_weights) for w in args.hard_factor_weights]
     for epoch in range(start_epoch, args.epochs):
         t0 = time.time()
         lr = optimizer.param_groups[0]["lr"]
@@ -479,7 +489,7 @@ def main(argv=None):
                                                 ema, teacher, args.kd_alpha, args.kd_temp, args.student_noise,
                                                 kd_loss, args.sam_rho, args.hard_aug, args.hard_factors,
                                                 args.hard_label_weight, args.hard_levels, hard_teacher,
-                                                args.hard_teacher_weight)
+                                                args.hard_teacher_weight, hard_factor_weights)
         val_loss, val_acc = evaluate(eval_model, val_loader, device, use_amp) if val_loader else (None, None)
         dt = time.time() - t0
         history.append(dict(epoch=epoch + 1, lr=lr, train_loss=train_loss, train_acc=train_acc,
