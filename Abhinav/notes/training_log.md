@@ -2361,3 +2361,28 @@ images; augmentations of them are allowed; no external data or weights; no evalu
   - The pair is the same either way: {PreAct + hard aug, M}. Kaggle scores the better of the two on private.
   - The team had 4 submissions left today.
 - **11:34 EST: HPC jobs 25111, 25142 and 25143 are pending again** (Priority) after the requeue.
+- **11:50 EST: what the public scores tell us (all submitted models; twin = 45k model on the 5k held-out set):**
+
+  | Model | Twin clean | Hard-factor suite | Public |
+  |---|---|---|---|
+  | A (no KD) | 97.08 | about 84 | 0.875 |
+  | F (FM KD, 300 ep) | 97.78 | 86.9 | 0.901 |
+  | G (PreAct, 300 ep) | 97.58 (fs 97.76) | 87.2 | 0.901 / 0.904 |
+  | H (800 ep) | 98.00 | 88.3 | 0.897 (K 0.894) |
+  | I (4 teachers) | 97.82 | 88.4 | 0.900 (J 0.902) |
+  | L (I + hard-aug fine-tune) | 97.86 | 93.1 | 0.906 |
+  | M (hard aug) | 97.96 | 93.7 | 0.910 |
+  | N (PreAct + hard aug) | 98.20 | 93.9 | 0.909 |
+
+  1. **Twin clean no longer predicts public in the top cluster:** H has 98.00 clean and 0.897 public; N's +0.24 clean
+     shows as −0.001. A pair's public gap has an SD of about 0.6 points (they differ on 35-50 of the 1,000 images).
+  2. **Hard aug is the only intervention that moved public consistently:** the three hard-aug models are the top three
+     (0.906-0.910) vs 0.894-0.904 for the six without it, about +0.7. The hard-factor suite is the only twin metric
+     that separates the two groups, so it is the better proxy for the hidden set (about 9% error vs 2% on the twin).
+  3. **This recipe has plateaued:** about 12 variants are within ±0.1 on the twin, and nothing inside the hard-aug
+     cluster is distinguishable on public.
+  4. **Further gains:**
+     - Today, only the runs already going (PreAct 6-factor twin + final, SAM pair), worth about ±0.1-0.3, which
+       public can't verify.
+     - Beyond today: hidden-set-like robustness over clean accuracy, i.e. hard-aug-trained teachers and more natural
+       factors (cat↔dog is about a third of the shared errors).
