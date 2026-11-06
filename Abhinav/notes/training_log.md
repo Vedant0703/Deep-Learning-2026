@@ -2230,3 +2230,54 @@ images; augmentations of them are allowed; no external data or weights; no evalu
       (0.48, below Run G's 0.52).
   - **Final `h_final600_pre_haug`** (50k, T50) finished 03:40. `submission_fs_bal.csv`: 4,980,392 params, 2,000
     rows, 77 labels changed by balancing, 194-206 per class. It differs from M on 77, L on 75, Run G on 87, C′ on 91.
+- **04:37 EST: two more twins.** Neither changes the picks.
+
+  | Twin (fs+bal) | Clean | Suite | Hard mean (fs) | McNemar vs M | Jaccard with M |
+  |---|---|---|---|---|---|
+  | M | 97.96 | 96.88 | 93.68 | – | – |
+  | `h_fm600_haugw` (wide levels) | 97.98 | 96.87 | 93.50 | 22 vs 25, p = 0.77 | 0.64 |
+  | `h_ftG100_haug_tw` (C: Run G + hard aug, 4 teachers) | 97.74 | 96.70 | 92.92 | 25 vs 36, p = 0.20 | 0.58 |
+
+  - **Wide levels:** a tie with M (it passes the bars, but it is M's family and doesn't beat M). Wider lowres/zoom ranges don't help.
+  - **C:** fails the bars and matches C′ (1 teacher). Both are dominated by `h_fm600_pre_haug`; Jaccard with it is 0.50.
+  - Downloaded: `h_final600_haug6` (its twin is still running).
+- **05:32 EST: `h_fm600_haug6` (6 factors: + rotate, perspective) twin:** a tie with M overall that trades lowres for rotation.
+
+  | Twin (fs+bal) | Clean | Suite | Hard mean (fs) | lowres16 | bg | rot20 | persp0.4 | McNemar vs M | Jaccard with M |
+  |---|---|---|---|---|---|---|---|---|---|
+  | M | 97.96 | 96.88 | 93.68 | 94.74 | 95.58 | 94.22 | 96.02 | – | – |
+  | `h_fm600_haug6` | 97.96 | 96.89 | 93.78 | 93.94 | 95.30 | **96.02** | 96.36 | 25 vs 29, p = 0.68 | 0.60 |
+
+  - Rotation training fixes M's worst factor (rot20 +1.8) but costs 0.8 on lowres16, since each factor's share drops from 1/4 to 1/6.
+  - It passes the bars but doesn't beat M, and it is M's family, so rule D gives it no pick. Its final `h_final600_haug6` is downloaded as a spare.
+- **06:12 EST: `h_fm600_hvd` (hard-view distillation: on hard images the KD target mixes the clean-view teachers
+  with M's hard-view answer, weight 0.5) twin: no gain.**
+  - fs+bal 97.86 / 96.82, hard 93.50 (lowres16 94.38, bg 95.10).
+  - McNemar vs M 18 vs 23, p = 0.53; Jaccard 0.67.
+  - It sits exactly on the clean bar and slightly below M everywhere; M's family, so no pick.
+  - M's own soft labels on hard views add nothing over the clean-view teacher target.
+- **06:42 EST: `c_fm600_hfw` (Colab; factor-weighted hard aug, lowres 0.35 / zoom_in 0.15 / zoom_out 0.20 / bg 0.30)
+  twin: fails the clean bar.**
+  - fs+bal 97.84 (< 97.86) / 96.83; hard 93.69 (= M), lowres16 95.04 (+0.30), bg 95.46.
+  - McNemar vs M 22 vs 27, p = 0.57; Jaccard 0.60. Train log: final val 97.72, flip 97.92.
+  - The weighting moves errors between factors without lowering the total, so by the pre-registered gate its final
+    `c_final600_hfw` was **not** run.
+  - The Colab VM was stopped at 06:43; balance 52.15 units.
+
+### Round 12 candidate table (twins, fs+bal; rule D bars: clean ≥ 97.86, suite ≥ 96.78, no significant McNemar loss)
+| Twin | Family | Clean | Suite | Hard | McNemar vs M | Jaccard with M | Rule D |
+|---|---|---|---|---|---|---|---|
+| **`h_fm600_pre_haug` (PreAct + hard aug)** | PreAct-V | **98.20** | **97.03** | **93.87** | 29 vs 25 | **0.48** | qualifies, beats M |
+| M `h_fm600_haug` | ResNet-C | 97.96 | 96.88 | 93.68 | – | – | reference |
+| `h_fm600_haug6` (6 factors) | ResNet-C | 97.96 | 96.89 | 93.78 | 25 vs 29 | 0.60 | ties M |
+| `h_fm600_haugw` (wide levels) | ResNet-C | 97.98 | 96.87 | 93.50 | 22 vs 25 | 0.64 | ties M |
+| `h_fm800_haug` (800 ep) | ResNet-C | 97.90 | 96.87 | 93.37 | 18 vs 30 | 0.67 | below M |
+| `soup_twin` (M + 4 fine-tunes) | ResNet-C | 97.88 | 96.83 | 93.40 | 12 vs 21 | 0.74 | below M |
+| `h_fm600_hvd` (hard-view KD) | ResNet-C | 97.86 | 96.82 | 93.50 | 18 vs 23 | 0.67 | below M |
+| `c_fm600_hfw` (factor weights) | ResNet-C | 97.84 | 96.83 | 93.69 | 22 vs 27 | 0.60 | fails clean bar |
+| `h_fm600_haug5` (p 0.5) | ResNet-C | 97.84 | 96.81 | 93.77 | 23 vs 27 | 0.60 | fails clean bar |
+| `c_ftG100_1t_tw` (C′) | PreAct-V | 97.78 | 96.65 | 92.88 | 24 vs 34 | 0.60 | fails |
+| `h_ftG100_haug_tw` (C) | PreAct-V | 97.74 | 96.70 | 92.92 | 25 vs 36 | 0.58 | fails |
+
+- **Final pair:** {M, PreAct + hard aug}. Which is Pick 1 depends on PreAct's public score: it is Pick 1 if its
+  public is ≥ 0.906 (M − 0.004), otherwise Pick 2. Its submission waits for the user's OK.
