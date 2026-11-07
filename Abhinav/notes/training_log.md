@@ -2409,3 +2409,4 @@ images; augmentations of them are allowed; no external data or weights; no evalu
   - On random 1k subsets it trails PreAct + haug 75% of the time.
   - Its final `h_final600_pre_haug6` (HPC 25206) keeps running so it completes (the user wants every run finished),
     but it is not a pick candidate. **The picks are unchanged: {PreAct + hard aug (0.909), M (0.910)}.**
+- **16:38 EST: SAM twin vs PreAct + haug twin at matched epochs** (val, no TTA, EMA): epoch 200 96.46 vs 96.24, 400 97.44 vs 97.20, 433 97.36 vs 97.22 (val loss 0.086 vs 0.096). A small lead, narrowing; Round 1's SAM lead faded in the low-LR phase. The SAM twin is due about 17:53.
