@@ -21,6 +21,7 @@ One folder per Kaggle submission, plus unsubmitted candidates. Each has the mode
 | Abhinav_mixoff-600 | – | 97.76 / 97.84 | 97.86 (suite mean 96.82) | Run I's recipe at 600 epochs with mixing off for the last 30 (Vedant's trick) | [`candidates/Abhinav_mixoff-600`](candidates/Abhinav_mixoff-600/) |
 | Abhinav_dist-600 | – | 97.54 / 97.82 | 97.76 (suite mean 96.61) | Run I's recipe at 600 epochs with the DIST loss (kd-alpha 0.67) instead of KL | [`candidates/Abhinav_dist-600`](candidates/Abhinav_dist-600/) |
 | Abhinav_preact-600 | – | 97.78 / 97.88 | 97.94 (suite mean 96.74; hard-factor suite 88.3) | Run I's recipe at 600 epochs on Vedant's PreAct 4.98M (preact_v) | [`candidates/Abhinav_preact-600`](candidates/Abhinav_preact-600/) |
+| Abhinav_preact-haug-sam | – | 97.96 / 98.12 | 98.12 (suite mean 97.02; hard-factor suite 93.7) | Run N's recipe + SAM (rho 0.05) on the student: ties Run N (McNemar 18 vs 22, p = 0.64) and misses its hard-suite bar, so not submitted | [`candidates/Abhinav_preact-haug-sam`](candidates/Abhinav_preact-haug-sam/) |
 
 Takeaways:
 

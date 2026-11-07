@@ -2410,3 +2410,19 @@ images; augmentations of them are allowed; no external data or weights; no evalu
   - Its final `h_final600_pre_haug6` (HPC 25206) keeps running so it completes (the user wants every run finished),
     but it is not a pick candidate. **The picks are unchanged: {PreAct + hard aug (0.909), M (0.910)}.**
 - **16:38 EST: SAM twin vs PreAct + haug twin at matched epochs** (val, no TTA, EMA): epoch 200 96.46 vs 96.24, 400 97.44 vs 97.20, 433 97.36 vs 97.22 (val loss 0.086 vs 0.096). A small lead, narrowing; Round 1's SAM lead faded in the low-LR phase. The SAM twin is due about 17:53.
+- **21:35 EST: SAM twin (`h_fm600_pre_haug_sam`) fails the gate; not submitted.** All three HPC jobs finished
+  (25206 `h_final600_pre_haug6`, 25207 SAM twin, 25208 SAM final). The NYU VPN was down from about 16:50 to 21:07, so
+  they were checked late.
+  | Twin (flip_shift) | clean / +bal | suite +bal | hard | vs PreAct + haug twin (bal) |
+  |---|---|---|---|---|
+  | PreAct + haug (Run N) | 98.08 / 98.20 | 97.03 | 93.87 | – |
+  | PreAct + haug + SAM 0.05 | 98.12 / 98.12 | 97.02 | 93.73 | 18 vs 22, p = 0.64, Jaccard 0.64 |
+  - The hard suite is lower on lowres16 (93.94 vs 94.72) and confuse0.7 (90.96 vs 91.50); the other factors tie.
+  - On 1k subsets it beats Run N 30%, ties 16% and trails 54% (mean gap −0.08).
+  - SAM's mid-run lead (+0.15-0.25 val to epoch 433) was gone by epoch 600, the same pattern as Round 1's `r1_sam`.
+    **SAM on the student is not worth its 1.35x cost here.**
+  - The SAM final's balanced predictions differ from Run N's submission on 68 of 2,000 hidden images and from Run M's
+    on 70. The folder is `Abhinav/submissions/candidates/Abhinav_preact-haug-sam`.
+  - Fix: `scratchpad/paired.py` printed the A-only confusions from B's predictions when B's run name was a prefix of
+    A's (`dog->dog`). The class counts and the McNemar test were unaffected.
+  - **Picks unchanged: {Run N (0.909), Run M (0.910)}.**
