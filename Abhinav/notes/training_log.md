@@ -2461,3 +2461,6 @@ images; augmentations of them are allowed; no external data or weights; no evalu
     optimum and doesn't come back, consistent with L (fine-tune, 0.906) < M (from scratch, 0.910).
   - Not submitted. Folder: `Abhinav/submissions/candidates/Abhinav_confuse-mix-ft` (final, twin, control twin,
     analysis scripts). **Final picks: M (0.910) + N (0.909).**
+- **23:28 EST: Run P (the confusion-aware final) submitted "just to see" (user's call): public 0.904** (N 0.909,
+  M 0.910). It agrees with the twin (significantly below N). Folder: `Abhinav/submissions/Abhinav_Run-P`. Picks
+  unchanged: M + N.

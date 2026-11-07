@@ -1,8 +1,8 @@
-# Abhinav_confuse-mix-ft: Run N fine-tuned 60 epochs with confusion-aware MixUp/CutMix (NYU HPC, Nov 6 night)
+# Abhinav_Run-P: Run N fine-tuned 60 epochs with confusion-aware MixUp/CutMix (NYU HPC, Nov 6 night)
 
 | | |
 |---|---|
-| Kaggle public | not submitted: significantly worse than Run N on the twin |
+| Kaggle public | **0.904** (submitted 2026-11-06 23:28 EST "just to see"; Run N 0.909, Run M 0.910) |
 | Architecture | `preact_v` (`src/models.py`), 4,980,392 trainable parameters |
 | Training data | all 50,000 images (fine-tune of Run N's final) |
 | Idea | half of the mixed images get a partner from a confusable class in the batch (cat-dog, airplane-ship, airplane-bird, deer-dog, automobile-truck: the twins' top validation confusions), so the teachers' soft labels on mixed cat/dog images teach the cat/dog boundary |
@@ -29,8 +29,8 @@
 
 ## Files
 
-- `model.pt`: the 50k fine-tune (`h_ftcfinal60_pre_haug`). `submission_balanced.csv`: its flip_shift + balanced
-  predictions (not submitted; they differ from Run N's submission on 54 of 2,000 images).
+- `model.pt`: the 50k fine-tune (`h_ftcfinal60_pre_haug`). `submission.csv`: the submitted flip_shift + balanced
+  predictions (they differ from Run N's submission on 54 of 2,000 images).
 - `twin/`: the 45k fine-tune of Run N's twin (`h_ftc60_pre_haug`), its `eval.log`, and the paired tests vs Run N's
   twin and vs the control.
 - `control_twin/`: the same fine-tune without confusion-aware mixing (`h_ft60_pre_haug`) and its `eval.log`.
