@@ -31,7 +31,7 @@ import torch
 import torch.nn as nn
 from torchvision.transforms import v2
 
-from .data import CIFAR10_MEAN, CIFAR10_STD, build_loaders
+from .data import CIFAR10_MEAN, CIFAR10_STD, CLASSES, build_loaders
 from .hard import ALL_BATCH_FACTORS, BATCH_FACTORS, HARD_LEVELS, hard_batch
 from .models import CONFIGS, PREACT_CONFIGS, TEACHER_CONFIGS, build_model, count_params
 
@@ -56,6 +56,12 @@ def get_args(argv=None):
     p.add_argument("--mix-alpha", type=float, default=0.0, help="MixUp/CutMix alpha (0 = off)")
     p.add_argument("--mix-prob", type=float, default=0.5, help="fraction of batches that get MixUp/CutMix")
     p.add_argument("--mix-off-epochs", type=int, default=0, help="turn MixUp/CutMix off for the last N epochs")
+    p.add_argument("--mix-confuse", type=float, default=0.0,
+                   help="share of mixed images whose partner is drawn from a confusable class in the batch "
+                        "(--mix-confuse-pairs); the rest keep torchvision's roll-by-one partner (0 = off)")
+    p.add_argument("--mix-confuse-pairs", nargs="+",
+                   default=["cat-dog", "airplane-ship", "airplane-bird", "deer-dog", "automobile-truck"],
+                   help="confusable class pairs (both directions), from the twins' validation confusions")
     p.add_argument("--ema", type=float, default=0.0,
                    help="per-step EMA decay of the weights, e.g. 0.999; the EMA model is evaluated and saved (0 = off)")
     p.add_argument("--teacher", nargs="+", default=None,
@@ -224,6 +230,45 @@ class TeacherEnsemble(nn.Module):
     def forward(self, x, temp=1.0):
         logp = torch.stack([nn.functional.log_softmax(m(x).float() / temp, 1) for m in self.members])
         return temp * (torch.logsumexp(logp, 0) - math.log(len(self.members)))
+
+
+class ConfusionMixer:
+    """MixUp or CutMix (50/50, one lambda ~ Beta(alpha, alpha) per batch, as torchvision's v2.MixUp / v2.CutMix), but
+    for a share p of the images whose class has a confusable class present in the batch, the partner is drawn at
+    random from those images instead of torchvision's roll-by-one partner. Returns the mixed batch and soft targets."""
+
+    def __init__(self, alpha, p, pairs, num_classes=10):
+        self.beta = torch.distributions.Beta(torch.tensor([alpha]), torch.tensor([alpha]))
+        self.p, self.num_classes = p, num_classes
+        self.adj = torch.zeros(num_classes, num_classes, dtype=torch.bool)
+        for pair in pairs:
+            a, b = (CLASSES.index(c) for c in pair.split("-"))
+            self.adj[a, b] = self.adj[b, a] = True
+
+    def partners(self, y):
+        idx = torch.roll(torch.arange(y.size(0), device=y.device), 1)
+        mask = self.adj.to(y.device)[y][:, y]  # mask[i, j]: image j's class is confusable with image i's
+        pick = mask.any(1) & (torch.rand(y.size(0), device=y.device) < self.p)
+        if pick.any():
+            idx[pick] = torch.multinomial(mask[pick].float(), 1).squeeze(1)
+        return idx
+
+    def __call__(self, x, y):
+        idx = self.partners(y)
+        lam = float(self.beta.sample())
+        if random.random() < 0.5:
+            x = lam * x + (1 - lam) * x[idx]
+        else:
+            h, w = x.shape[-2:]
+            rh, rw = int(h * math.sqrt(1 - lam)), int(w * math.sqrt(1 - lam))
+            cy, cx = random.randrange(h), random.randrange(w)
+            y1, y2 = max(cy - rh // 2, 0), min(cy + rh // 2, h)
+            x1, x2 = max(cx - rw // 2, 0), min(cx + rw // 2, w)
+            x = x.clone()
+            x[..., y1:y2, x1:x2] = x[idx][..., y1:y2, x1:x2]
+            lam = 1 - (y2 - y1) * (x2 - x1) / (h * w)
+        onehot = nn.functional.one_hot(y, self.num_classes).float()
+        return x, lam * onehot + (1 - lam) * onehot[idx]
 
 
 def add_pixel_noise(x, max_std, p=0.5):
@@ -439,7 +484,10 @@ def main(argv=None):
     scheduler = make_scheduler(optimizer, len(train_loader), args)
     scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
     mixer = None
-    if args.mix_alpha > 0:
+    if args.mix_alpha > 0 and args.mix_confuse > 0:
+        mixer = ConfusionMixer(args.mix_alpha, args.mix_confuse, args.mix_confuse_pairs)
+        print(f"Confusion-aware mixing: {args.mix_confuse:.0%} of partners from {' '.join(args.mix_confuse_pairs)}")
+    elif args.mix_alpha > 0:
         mixer = v2.RandomChoice([v2.MixUp(alpha=args.mix_alpha, num_classes=10),
                                  v2.CutMix(alpha=args.mix_alpha, num_classes=10)])
 

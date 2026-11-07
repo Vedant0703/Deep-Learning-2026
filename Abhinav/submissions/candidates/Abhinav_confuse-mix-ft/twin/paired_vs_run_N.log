@@ -1,0 +1,19 @@
+h_ftc60_pre_haug     fs 97.76  fs+bal 97.86
+h_fm600_pre_haug     fs 98.08  fs+bal 98.20
+
+fs+bal: both wrong 80 | only h_ftc60_pre_haug right 10 | only h_fm600_pre_haug right 27 | McNemar p = 0.008 | Jaccard 0.68
+
+fs: both wrong 84 | only h_ftc60_pre_haug right 12 | only h_fm600_pre_haug right 28 | McNemar p = 0.017 | Jaccard 0.68
+
+errors by true class (fs+bal):  airpl  autom   bird    cat   deer    dog   frog  horse   ship  truck
+both wrong                        6      3      9     20      6     20      5      3      4      4 | 80
+only h_fm600_pre_haug wrong       0      0      1      6      0      1      1      0      1      0 | 10
+only h_ftc60_pre_haug wrong       4      4      1      6      1      8      0      0      1      2 | 27
+
+top confusions (true -> predicted, fs+bal):
+  both wrong                 dog->cat 17, cat->dog 13, airplane->ship 4, frog->bird 4, deer->dog 3
+  only h_fm600_pre_haug wrong cat->dog 4, cat->frog 2, ship->airplane 1, bird->airplane 1, frog->horse 1
+  only h_ftc60_pre_haug wrong cat->dog 6, dog->cat 6, automobile->truck 2, dog->deer 2, airplane->horse 2
+
+10,000 random 1,000-image subsets, fs+bal gap h_ftc60_pre_haug - h_fm600_pre_haug (points): mean -0.34, 5-95% [-0.7, +0.1]
+  P(gap > 0) 0.05 | P(gap = 0) 0.06 | P(gap < 0) 0.89 | P(gap >= +0.4) 0.00 | P(gap <= -0.4) 0.48

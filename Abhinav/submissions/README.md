@@ -21,6 +21,7 @@ One folder per Kaggle submission, plus unsubmitted candidates. Each has the mode
 | Abhinav_sam-teacher | – | 97.86 / 97.78 | 97.82 (suite mean 96.47 → 96.71) | function-matching KD from one WRN-28-10 SAM teacher, 800 epochs, all 50k | [`candidates/Abhinav_sam-teacher`](candidates/Abhinav_sam-teacher/) |
 | Abhinav_mixoff-600 | – | 97.76 / 97.84 | 97.86 (suite mean 96.82) | Run I's recipe at 600 epochs with mixing off for the last 30 (Vedant's trick) | [`candidates/Abhinav_mixoff-600`](candidates/Abhinav_mixoff-600/) |
 | Abhinav_dist-600 | – | 97.54 / 97.82 | 97.76 (suite mean 96.61) | Run I's recipe at 600 epochs with the DIST loss (kd-alpha 0.67) instead of KL | [`candidates/Abhinav_dist-600`](candidates/Abhinav_dist-600/) |
+| Abhinav_confuse-mix-ft | – | 97.62 / 97.78 | 97.86 (suite mean 96.69; hard-factor suite 93.1) | Run N fine-tuned 60 epochs with confusion-aware MixUp/CutMix (cat-dog etc. partners): worse than Run N (McNemar 10 vs 27, p = 0.008) and tied with a plain fine-tune control | [`candidates/Abhinav_confuse-mix-ft`](candidates/Abhinav_confuse-mix-ft/) |
 | Abhinav_preact-600 | – | 97.78 / 97.88 | 97.94 (suite mean 96.74; hard-factor suite 88.3) | Run I's recipe at 600 epochs on Vedant's PreAct 4.98M (preact_v) | [`candidates/Abhinav_preact-600`](candidates/Abhinav_preact-600/) |
 
 Takeaways:

@@ -1,0 +1,35 @@
+
+== h_fm600_haug: fs 98.00 -> fs+bal 97.96 | balancing changed 20 predictions: wrong->right 9, right->wrong 11, wrong->wrong 0
+   true class   w->r  r->w   net  #pred fs #pred bal
+   airplane        0     3    -3       503       500
+   automobile      0     0    +0       498       499
+   bird            4     0    +4       496       502
+   cat             3     0    +3       489       499
+   deer            0     2    -2       506       501
+   dog             0     4    -4       508       500
+   frog            0     1    -1       502       500
+   horse           2     0    +2       496       499
+   ship            0     1    -1       502       500
+   truck           0     0    +0       500       500
+   wrong->right moves (fs pred -> bal pred): dog->cat 3, deer->bird 3, dog->horse 1, frog->bird 1, ship->horse 1
+   right->wrong moves (fs pred -> bal pred): dog->cat 3, airplane->bird 2, deer->cat 2, frog->cat 1, airplane->cat 1, dog->horse 1
+
+== h_fm600_pre_haug: fs 98.08 -> fs+bal 98.20 | balancing changed 19 predictions: wrong->right 12, right->wrong 6, wrong->wrong 1
+   true class   w->r  r->w   net  #pred fs #pred bal
+   airplane        1     0    +1       502       503
+   automobile      0     0    +0       499       500
+   bird            3     0    +3       498       501
+   cat             5     0    +5       488       496
+   deer            0     0    +0       502       500
+   dog             0     4    -4       512       501
+   frog            1     0    +1       498       499
+   horse           2     0    +2       498       501
+   ship            0     0    +0       502       500
+   truck           0     2    -2       501       499
+   wrong->right moves (fs pred -> bal pred): dog->cat 4, deer->bird 2, airplane->frog 1, ship->cat 1, dog->horse 1, dog->bird 1
+   right->wrong moves (fs pred -> bal pred): dog->cat 3, truck->automobile 1, truck->airplane 1, dog->horse 1
+
+== h_fm600_haug vs h_fm600_pre_haug after balancing: they disagree on 56 images (true cat/dog 31, other 25)
+   h_fm600_haug: right on 19 of them (cat/dog 13, other 6)
+   h_fm600_pre_haug: right on 31 of them (cat/dog 17, other 14)
+   both wrong 71, of which true cat/dog 34

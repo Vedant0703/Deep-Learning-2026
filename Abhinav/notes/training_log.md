@@ -2429,3 +2429,35 @@ images; augmentations of them are allowed; no external data or weights; no evalu
 - **21:35 EST: Run O (= the SAM final) submitted "just to see" (user's call): public 0.905** (Run N 0.909, Run M 0.910).
   It agrees with the twin (a tie with Run N, slightly below), and the 4-image gap is within the public LB's noise. The
   folder moved from `candidates/Abhinav_preact-haug-sam` to `Abhinav/submissions/Abhinav_Run-O`. Picks unchanged.
+- **21:55 EST: what Sinkhorn balancing changes on the twins** (`scratchpad/sinkhorn_transitions.py`, 5k held-out
+  split, flip_shift TTA):
+  | Twin | fs → fs+bal | changed | wrong→right | right→wrong | main move |
+  |---|---|---|---|---|---|
+  | M (`h_fm600_haug`) | 98.00 → 97.96 | 20 | 9 | 11 | dog→cat (3 fixed, 3 broken), deer→bird 3 fixed |
+  | N (`h_fm600_pre_haug`) | 98.08 → 98.20 | 19 | 12 | 6 | dog→cat (4 fixed, 3 broken), deer→bird 2 fixed |
+  - Both twins over-predict dog on the balanced val set (508 / 512 dog predictions for 500 dogs); balancing mostly
+    moves dog→cat. Its net effect is noise-sized (M −2, N +6 images), unlike on the hidden set, where it corrects
+    a real airplane/automobile skew.
+  - After balancing, M and N disagree on 56 images: 31 are true cat/dog. N is right on 31 (17 cat/dog), M on 19
+    (13 cat/dog). Of the 71 images both get wrong, 34 are cat/dog.
+  - So cat/dog is the dominant remaining error on the twin, and the target of the confusion-aware mixing run below.
+    No inference change follows (T=1 is the approved decoding).
+- **21:54 EST: confusion-aware MixUp/CutMix fine-tune of N** (the user: "Run all of it"). New `src/train.py` flags:
+  `--mix-confuse 0.5` (half the mixed images get a partner from a confusable class in the batch: cat-dog,
+  airplane-ship, airplane-bird, deer-dog, automobile-truck) via `ConfusionMixer`; otherwise torchvision's roll-by-one.
+  60-epoch fine-tunes (lr 0.02, warmup 1) of N's twin / final with N's full recipe: HPC 25915 `h_ftc60_pre_haug`
+  (twin), 25916 `h_ftcfinal60_pre_haug` (final), 25917 `h_ft60_pre_haug` (control: same fine-tune, plain mixing).
+  All booted on the first try and run at 21.5-23.3 s/epoch (ETA about 22:20 EST).
+- **22:52 EST: confusion-aware mixing result: no gain; the fine-tune itself costs about 0.3.** All three HPC jobs
+  finished first try (exit 0).
+  | Twin (fs+bal) | clean | suite | hard | vs N twin (McNemar, fs+bal) |
+  |---|---|---|---|---|
+  | N (`h_fm600_pre_haug`) | 98.20 | 97.03 | 93.87 | – |
+  | control fine-tune (`h_ft60_pre_haug`) | 97.90 | 96.74 | 93.26 | 21 vs 29, p = 0.32 |
+  | confusion-aware fine-tune (`h_ftc60_pre_haug`) | 97.86 | 96.69 | 93.08 | 10 vs 27, p = 0.008 |
+  - Confusion-aware vs control: 19 vs 21 (p = 0.88). The cat/dog errors aren't reduced (12 only-confuse vs 8
+    only-control).
+  - Both fine-tunes' best val checkpoint is their starting point (98.06). A 60-epoch restart at lr 0.02 leaves N's
+    optimum and doesn't come back, consistent with L (fine-tune, 0.906) < M (from scratch, 0.910).
+  - Not submitted. Folder: `Abhinav/submissions/candidates/Abhinav_confuse-mix-ft` (final, twin, control twin,
+    analysis scripts). **Final picks: M (0.910) + N (0.909).**
