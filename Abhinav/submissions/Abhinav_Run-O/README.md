@@ -1,8 +1,8 @@
-# Abhinav_preact-haug-sam: Run N's recipe + SAM (rho 0.05) on the student, 600 epochs, all 50k (NYU HPC)
+# Abhinav_Run-O: Run N's recipe + SAM (rho 0.05) on the student, 600 epochs, all 50k (NYU HPC)
 
 | | |
 |---|---|
-| Kaggle public | not submitted: it failed the gate below |
+| Kaggle public | **0.905** (submitted 2026-11-06 21:35 EST "just to see" after it failed the gate below; Run N 0.909, Run M 0.910) |
 | Architecture | `preact_v` (`src/models.py`), 4,980,392 trainable parameters |
 | Training data | all 50,000 images, from scratch |
 | Twin val (none / flip TTA, from train.log) | 97.96 / 98.12 (Run N's twin: 98.06 / 98.06) |
@@ -14,14 +14,16 @@
 - Gate for a new PreAct-family pick: clean ≥ 98.10, hard ≥ 93.87 and no significant McNemar loss vs Run M. It passes
   the clean bar but misses the hard bar, and it is below Run N on both.
 - On random 1,000-image subsets of the held-out set (the public LB's size), it beats Run N 30% of the time, ties 16%
-  and trails 54% (mean gap -0.08 points). A tie with Run N, so it was not submitted.
+  and trails 54% (mean gap -0.08 points). A tie with Run N, so it is not a final pick. Its public 0.905 (4 images
+  below Run N) agrees with that.
 - SAM led Run N's twin by about 0.15-0.25 val points through epoch 433. The lead was gone by epoch 600, as in Round 1.
 - The final model's predictions differ from Run N's submission on 68 of 2,000 hidden images and from Run M's on 70.
 
 ## Files
 
 - `model.pt`: the 50k weights (EMA). Load with `src.train.load_model`.
-- `submission_balanced.csv`: flip_shift TTA + class-balanced decoding (`--tta flip_shift --balance`). Not submitted.
+- `submission.csv`: the predictions that were submitted: flip_shift TTA (10 views) + class-balanced decoding
+  (`src.predict --tta flip_shift --balance`, approved by the professor on Nov 4).
 - `config.json`: all hyperparameters.
 - `twin/`: the same recipe trained on 45k with 5k held out (`runs/h_fm600_pre_haug_sam`), used to validate it. It
   has `model.pt`, `config.json`, `eval.log` (src.evaluate with `--hard-suite --baseline` Run N's twin) and
@@ -44,5 +46,5 @@ python -m src.train --out runs/h_final600_pre_haug_sam --model preact_v --epochs
 ## Predict
 
 ```
-python -m src.predict --ckpt submissions/candidates/Abhinav_preact-haug-sam/model.pt --out submission.csv --tta flip_shift --balance
+python -m src.predict --ckpt submissions/Abhinav_Run-O/model.pt --out submission.csv --tta flip_shift --balance
 ```

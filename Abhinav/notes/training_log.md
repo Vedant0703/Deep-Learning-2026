@@ -2426,3 +2426,6 @@ images; augmentations of them are allowed; no external data or weights; no evalu
   - Fix: `scratchpad/paired.py` printed the A-only confusions from B's predictions when B's run name was a prefix of
     A's (`dog->dog`). The class counts and the McNemar test were unaffected.
   - **Picks unchanged: {Run N (0.909), Run M (0.910)}.**
+- **21:35 EST: Run O (= the SAM final) submitted "just to see" (user's call): public 0.905** (Run N 0.909, Run M 0.910).
+  It agrees with the twin (a tie with Run N, slightly below), and the 4-image gap is within the public LB's noise. The
+  folder moved from `candidates/Abhinav_preact-haug-sam` to `Abhinav/submissions/Abhinav_Run-O`. Picks unchanged.
