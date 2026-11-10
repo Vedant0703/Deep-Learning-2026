@@ -106,8 +106,8 @@ def leaderboard():
     for src, dst in ((57966136, 58014369), (57991519, 58014367)):
         b.annotate("", (at(dst).pub, at(dst).prv), (at(src).pub, at(src).prv),
                    arrowprops=dict(arrowstyle="->", color=INK, lw=0.8, shrinkA=4, shrinkB=4))
-    b.text(88.25, 88.1, "Run H \u2192 K", fontsize=7.5)
-    b.text(90.3, 88.08, "Run I \u2192 J", fontsize=7.5)
+    for x, y, name in ((89.6, 86.95, "H"), (90.06, 87.5, "I"), (89.17, 88.85, "K"), (90.03, 88.45, "J")):
+        b.text(x, y, name, fontsize=8)
     b.annotate("Run M", (at(58031983).pub, at(58031983).prv), xytext=(5, 2), textcoords="offset points",
                fontsize=7.5)
     b.set_xlim(87, 92)
