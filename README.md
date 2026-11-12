@@ -42,8 +42,10 @@ submission, with its held-out numbers, is in [`submissions/README.md`](submissio
 |---|---|---|---|---|---|
 | A | Vedant | 4.98M PreAct wide ResNet (`preact_v`), 300 epochs, EMA, 45k images | 97.08 | 0.875 | 0.865 |
 | B | Vedant | Run A's recipe on all 50k images | – | 0.892 | 0.873 |
+|Scratch| Dhanush| Scratch baseline, 200 epochs, 45k images, flip TTA | 96.76 | 0.878 | 0.858 |
 | D | Abhinav | distillation from a WRN-28-10 teacher + input noise | 97.50 | 0.891 | 0.865 |
 | F | Abhinav | function-matching distillation (the teacher labels the mixed images) | 97.78 | 0.901 | 0.870 |
+|G-TTA| Dhanush| Run G's existing weights + 10-view translation/flip TTA; no balancing or retraining | 97.76 (fs) | 0.904 | 0.873 |
 | I | Abhinav | 4-teacher ensemble, 800 epochs | 97.82 | 0.900 | 0.876 |
 | J | Abhinav | Run I's model + flip-and-shift TTA + class-balanced decoding | 97.96 (fs + bal) | 0.902 | 0.884 |
 | M | Abhinav | Run I's recipe + hard-factor augmentation, 600 epochs | 97.96 (fs + bal) | **0.910** | **0.893** |
@@ -90,7 +92,7 @@ report/         final-report figures (figures/), the script that draws them, lea
 - **Vedant Pradhan** designed the `preact_v` architecture and the baseline recipe, trained Runs A to C and the
   ensemble-distilled Run D ([`notebooks/vedant/`](notebooks/vedant/),
   [`submissions/Vedant_Runs-A-D/`](submissions/Vedant_Runs-A-D/)), and set up the team repository and HPC notebooks.
-- **Dhanushkumar Jayakumar** trained a scratch baseline and audited Run G's inference: his translation-and-flip TTA lifted Run G
+- **Dhanushkumar Jayakumar Vasuki** trained a scratch baseline and audited Run G's inference: his translation-and-flip TTA lifted Run G
   from 0.901 to 0.904 public without retraining ([`experiments/run_g_tta/`](experiments/run_g_tta/),
   [`submissions/Dhanush_Run-G-TTA/`](submissions/Dhanush_Run-G-TTA/)).
 - **Abhinav Sivakumar** wrote the training and evaluation pipeline (`src/`, `scripts/`), the twin protocol and the hard-factor
