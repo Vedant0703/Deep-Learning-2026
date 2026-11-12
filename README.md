@@ -1,8 +1,8 @@
 # Efficient ResNet on CIFAR-10 (at most 5M parameters)
 
 NYU Deep Learning, Fall 2026, Project 1, team **Survey Corps**: Abhinav Sivakumar
-([ebbynav](https://github.com/ebbynav)), Vedant ([Vedant0703](https://github.com/Vedant0703)) and Dhanush
-([Dhanush010](https://github.com/Dhanush010)). We train a single ResNet with at most 5,000,000 trainable parameters
+([ebbynav](https://github.com/ebbynav)), Vedant Pradhan ([Vedant0703](https://github.com/Vedant0703)) and
+Dhanushkumar Jayakumar ([Dhanush010](https://github.com/Dhanush010)). We train a single ResNet with at most 5,000,000 trainable parameters
 **from scratch** on the CIFAR-10 training images provided by the course, for the Kaggle competition
 [cifar-10-res-net-architecture-challenge-dl](https://www.kaggle.com/competitions/cifar-10-res-net-architecture-challenge-dl).
 
@@ -13,6 +13,8 @@ public leaderboard (18th) and **0.893 on the private leaderboard, 6th of 81 team
 
 Everything for it is in [`submissions/Abhinav_Run-M/`](submissions/Abhinav_Run-M/): the weights (`model.pt`), the
 submitted predictions, the training log, the 45k twin used to validate it and the exact training command.
+[`notebooks/final_model.ipynb`](notebooks/final_model.ipynb) loads it and prints its parameter count, held-out and
+final test accuracy, reproduces the submitted CSV and plots its training curves (outputs saved).
 
 | | |
 |---|---|
@@ -71,7 +73,8 @@ src/            training, evaluation and prediction code (python -m src.train / 
   predict.py    test-time augmentation and class-balanced decoding; writes and validates submission.csv
 scripts/        Colab runner (colab.py), Kaggle submit (submit.sh), run comparison, model soups, hard-suite figure
   hpc/          NYU HPC Cloud Bursting: environment setup, train.sbatch, the job babysitter, job queues
-notebooks/      project1.ipynb: end-to-end Colab notebook (data, parameter counts, training, curves, submission)
+notebooks/      final_model.ipynb: the submitted model's parameters, accuracy, predictions and training curves
+                project1.ipynb: end-to-end Colab notebook (data, parameter counts, training, curves, submission)
   vedant/       Vedant's notebooks for Runs A and B, Run C (robust augmentation) and Run D (ensemble distillation)
 submissions/    one folder per Kaggle submission: model.pt, submitted CSV, logs, 45k twin, README with the command
   candidates/   trained but not submitted
@@ -84,13 +87,13 @@ report/         final-report figures (figures/), the script that draws them, lea
 
 ## Team contributions
 
-- **Vedant** designed the `preact_v` architecture and the baseline recipe, trained Runs A to C and the
+- **Vedant Pradhan** designed the `preact_v` architecture and the baseline recipe, trained Runs A to C and the
   ensemble-distilled Run D ([`notebooks/vedant/`](notebooks/vedant/),
   [`submissions/Vedant_Runs-A-D/`](submissions/Vedant_Runs-A-D/)), and set up the team repository and HPC notebooks.
-- **Dhanush** trained a scratch baseline and audited Run G's inference: his translation-and-flip TTA lifted Run G
+- **Dhanushkumar Jayakumar** trained a scratch baseline and audited Run G's inference: his translation-and-flip TTA lifted Run G
   from 0.901 to 0.904 public without retraining ([`experiments/run_g_tta/`](experiments/run_g_tta/),
   [`submissions/Dhanush_Run-G-TTA/`](submissions/Dhanush_Run-G-TTA/)).
-- **Abhinav** wrote the training and evaluation pipeline (`src/`, `scripts/`), the twin protocol and the hard-factor
+- **Abhinav Sivakumar** wrote the training and evaluation pipeline (`src/`, `scripts/`), the twin protocol and the hard-factor
   suite, trained the teachers and Runs D to P, and ran the leaderboard analysis (`report/`).
 
 ## Reproducing the results
