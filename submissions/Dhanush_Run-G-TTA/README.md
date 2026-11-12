@@ -21,7 +21,7 @@ Final-model flip predictions reproduced the original CSV exactly; translation TT
 
 ## Reproduce inference
 
-From `Abhinav/`, with the original competition data extracted in DATA_DIR:
+From the repository root, with the original competition data extracted in DATA_DIR:
 
 ```bash
 python -m src.predict --ckpt submissions/Abhinav_Run-G/model.pt --data-dir DATA_DIR --out reproduced_run_g_shift.csv --tta flip_shift

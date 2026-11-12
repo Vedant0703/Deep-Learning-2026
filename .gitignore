@@ -18,9 +18,6 @@ runs/.supervisor-*.log
 # local Claude Code state and partial checkpoint downloads
 .claude/
 *.download
-# the shared baseline model and its submission (Run F) are committed on purpose
-!final_model/final_model.pt
-!final_model/submission.csv
 # per-submission folders share their weights and CSVs on purpose (each model.pt is about 18.6 MB)
 !submissions/**/model.pt
 !submissions/**/*.csv

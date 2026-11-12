@@ -1,6 +1,10 @@
-"""Figures for the final report (Figs. 2-4; Fig. 1 is figures/hard_suite_examples.png from src.evaluate).
+"""Figures for the final report (Figs. 2-4; Fig. 1 comes from scripts/hard_suite_figure.py).
 Usage: make_figures.py PUBLIC_LB_CSV PRIVATE_LB_CSV OUR_SUBMISSIONS_CSV OUT_DIR. The three CSVs come from the Kaggle
-CLI after the competition closed (competitions leaderboard --download / --show -v, competitions submissions -v)."""
+CLI after the competition closed (competitions leaderboard --download / --show -v, competitions submissions -v):
+
+    python report/make_figures.py report/data/public_leaderboard.csv report/data/private_leaderboard.csv \
+        report/data/team_submissions.csv report/figures
+"""
 import sys
 from pathlib import Path
 

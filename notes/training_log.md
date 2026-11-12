@@ -3,6 +3,9 @@
 A running record of what the training curves show, written while runs train. It is meant for choosing the next
 round's changes and for the report. Each round should start from the "Open questions" section at the bottom.
 
+Until Nov 11 everything here lived in the `Abhinav/` folder of the `abhinav` branch. It is now the repository root on
+`main`, so every path in this log is relative to the root.
+
 Curves are compared with `python scripts/compare_runs.py [--remote] RUN ...`. Runs are compared at the same
 fraction of their schedule (cosine decay over the whole run), not at the same epoch.
 
@@ -1611,7 +1614,7 @@ toward 98.3-98.6.
   70 balanced predictions differ.
 - **12:30 EST: everything is shared on GitHub for the team.** Branch `abhinav` of `Vedant0703/Deep-Learning-2026`,
   commit `01aef2a`.
-  - `Abhinav/submissions/Abhinav_Run-{D,E,F,G,H,I}/` and `candidates/{Abhinav_1600-epochs,Abhinav_ens3,
+  - `submissions/Abhinav_Run-{D,E,F,G,H,I}/` and `candidates/{Abhinav_1600-epochs,Abhinav_ens3,
     Abhinav_sam-teacher}/`, each with:
     - `model.pt`;
     - the submitted `submission.csv` (D/E regenerated from their checkpoints; regeneration reproduces F's file byte
@@ -1769,7 +1772,7 @@ toward 98.3-98.6.
   - On the public 1,000, decoding moved I by +2 images and H by −3, net −1 over the pair. Each changes about 80 of
     2,000 predictions, so about 40 public ones. That is within noise; the public set can't tell whether balancing
     helps.
-- **02:40 EST GitHub:** `abhinav` commit 5c5f117 adds `Abhinav/submissions/Abhinav_Run-J`, `Abhinav_Run-K` and
+- **02:40 EST GitHub:** `abhinav` commit 5c5f117 adds `submissions/Abhinav_Run-J`, `Abhinav_Run-K` and
   `candidates/{Abhinav_mixoff-600,Abhinav_dist-600,Abhinav_preact-600}`. It also has the Round 8 logs, the updated
   `src/predict.py` / `src/evaluate.py`, these notes and the README results table.
 
@@ -1971,7 +1974,8 @@ images; augmentations of them are allowed; no external data or weights; no evalu
   (lowres16 80.42, zoom_out 86.58, bg 82.68). So Run M's twin gains +4.9 on the mean, +14.3 on lowres16, +9.7 on
   zoom-out and +12.9 on background (all flip_shift).
 - **Team write-up:** `SurveyCorps_CIFAR10_findings_Nov5.pdf` (6 pages: approach, baselines, KD, hard-image
-  augmentation, results, ideas for parallel work, GitHub links), in `Abhinav/reports/` on the `abhinav` branch.
+  augmentation, results, ideas for parallel work, GitHub links), now in `report/` (first published in
+  `Abhinav/reports/` on the `abhinav` branch).
   Figure 1 comes from `scripts/hard_suite_figure.py`.
 - **13:34 EST: Dhanush submitted "Run G, single 4.98M PreAct ResNet, 10-view translation + horizontal-flip probability
   TTA. Twin validation 97.76%. No class balancing." → 0.904** (ref 58032451), the team's third-best score after M
@@ -2023,7 +2027,7 @@ images; augmentations of them are allowed; no external data or weights; no evalu
 
   - L is the *least* decorrelated from M, so it is a weak hedge for the private half.
 - **15:00 EST: Dhanush's 0.904 is a re-decoding of Abhinav's Run G** (branch `dhanush/run-g-tta-0904`, folder
-  `Abhinav/submissions/Dhanush_Run-G-TTA`).
+  `submissions/Dhanush_Run-G-TTA`).
   - Same `r2_final_S` weights (preact_v, FM KD from `teacher_wrn300`, 300 epochs) with `--tta flip_shift`, no
     balancing; 31 of 2,000 labels changed from Run G.
   - Its twin: 97.58 flip → 97.76 fs; public 0.901 → 0.904. So the three best team scores are all Abhinav's models
@@ -2422,13 +2426,13 @@ images; augmentations of them are allowed; no external data or weights; no evalu
   - SAM's mid-run lead (+0.15-0.25 val to epoch 433) was gone by epoch 600, the same pattern as Round 1's `r1_sam`.
     **SAM on the student is not worth its 1.35x cost here.**
   - The SAM final's balanced predictions differ from Run N's submission on 68 of 2,000 hidden images and from Run M's
-    on 70. The folder is `Abhinav/submissions/candidates/Abhinav_preact-haug-sam`.
+    on 70. The folder is `submissions/candidates/Abhinav_preact-haug-sam`.
   - Fix: `scratchpad/paired.py` printed the A-only confusions from B's predictions when B's run name was a prefix of
     A's (`dog->dog`). The class counts and the McNemar test were unaffected.
   - **Picks unchanged: {Run N (0.909), Run M (0.910)}.**
 - **21:35 EST: Run O (= the SAM final) submitted "just to see" (user's call): public 0.905** (Run N 0.909, Run M 0.910).
   It agrees with the twin (a tie with Run N, slightly below), and the 4-image gap is within the public LB's noise. The
-  folder moved from `candidates/Abhinav_preact-haug-sam` to `Abhinav/submissions/Abhinav_Run-O`. Picks unchanged.
+  folder moved from `candidates/Abhinav_preact-haug-sam` to `submissions/Abhinav_Run-O`. Picks unchanged.
 - **21:55 EST: what Sinkhorn balancing changes on the twins** (`scratchpad/sinkhorn_transitions.py`, 5k held-out
   split, flip_shift TTA):
   | Twin | fs → fs+bal | changed | wrong→right | right→wrong | main move |
@@ -2459,8 +2463,8 @@ images; augmentations of them are allowed; no external data or weights; no evalu
     only-control).
   - Both fine-tunes' best val checkpoint is their starting point (98.06). A 60-epoch restart at lr 0.02 leaves N's
     optimum and doesn't come back, consistent with L (fine-tune, 0.906) < M (from scratch, 0.910).
-  - Not submitted. Folder: `Abhinav/submissions/candidates/Abhinav_confuse-mix-ft` (final, twin, control twin,
+  - Not submitted. Folder: `submissions/candidates/Abhinav_confuse-mix-ft` (final, twin, control twin,
     analysis scripts). **Final picks: M (0.910) + N (0.909).**
 - **23:28 EST: Run P (the confusion-aware final) submitted "just to see" (user's call): public 0.904** (N 0.909,
-  M 0.910). It agrees with the twin (significantly below N). Folder: `Abhinav/submissions/Abhinav_Run-P`. Picks
+  M 0.910). It agrees with the twin (significantly below N). Folder: `submissions/Abhinav_Run-P`. Picks
   unchanged: M + N.

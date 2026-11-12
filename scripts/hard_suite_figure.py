@@ -1,7 +1,7 @@
 """Saves an example grid of the hard-factor suite (src/hard.py): one held-out image per class, each factor at its
-suite level, labelled by row and class. Used for Figure 1 of the Round 9 write-up.
+suite level, labelled by row and class. Used for Figure 1 of the Round 9 write-up and of the final report.
 
-    python scripts/hard_suite_figure.py figures/hard_suite_examples.png
+    python scripts/hard_suite_figure.py report/figures/fig1_hard_suite_examples.png
 """
 import sys
 from pathlib import Path
