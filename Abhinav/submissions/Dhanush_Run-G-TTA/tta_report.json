@@ -1,0 +1,136 @@
+{
+  "checkpoint_sha256": {
+    "model.pt": "940b141c7d62f3fc3cec7a4a84bf71aebae52da2b7401cbcfa642a216f0d3880",
+    "twin/model.pt": "7432f732a08b038d279d73b6bd18524422b3e221a61a692bea4cee27ca1a1755"
+  },
+  "torch_version": "2.8.0+cu128",
+  "validation": {
+    "clean": {
+      "none": {
+        "accuracy": 0.974,
+        "rescued": 10,
+        "harmed": 19,
+        "net_correct": -9,
+        "changed": 34
+      },
+      "flip_prob": {
+        "accuracy": 0.9758,
+        "rescued": 0,
+        "harmed": 0,
+        "net_correct": 0,
+        "changed": 0
+      },
+      "flip_logit": {
+        "accuracy": 0.9758,
+        "rescued": 1,
+        "harmed": 1,
+        "net_correct": 0,
+        "changed": 3
+      },
+      "shift_prob": {
+        "accuracy": 0.9776,
+        "rescued": 15,
+        "harmed": 6,
+        "net_correct": 9,
+        "changed": 23
+      }
+    },
+    "brightness_low": {
+      "none": {
+        "accuracy": 0.9724,
+        "rescued": 11,
+        "harmed": 27,
+        "net_correct": -16,
+        "changed": 40
+      },
+      "flip_prob": {
+        "accuracy": 0.9756,
+        "rescued": 0,
+        "harmed": 0,
+        "net_correct": 0,
+        "changed": 0
+      },
+      "flip_logit": {
+        "accuracy": 0.9758,
+        "rescued": 1,
+        "harmed": 0,
+        "net_correct": 1,
+        "changed": 1
+      },
+      "shift_prob": {
+        "accuracy": 0.9764,
+        "rescued": 14,
+        "harmed": 10,
+        "net_correct": 4,
+        "changed": 28
+      }
+    },
+    "brightness_high": {
+      "none": {
+        "accuracy": 0.9716,
+        "rescued": 7,
+        "harmed": 30,
+        "net_correct": -23,
+        "changed": 40
+      },
+      "flip_prob": {
+        "accuracy": 0.9762,
+        "rescued": 0,
+        "harmed": 0,
+        "net_correct": 0,
+        "changed": 0
+      },
+      "flip_logit": {
+        "accuracy": 0.9762,
+        "rescued": 0,
+        "harmed": 0,
+        "net_correct": 0,
+        "changed": 0
+      },
+      "shift_prob": {
+        "accuracy": 0.9772,
+        "rescued": 14,
+        "harmed": 9,
+        "net_correct": 5,
+        "changed": 27
+      }
+    },
+    "blur": {
+      "none": {
+        "accuracy": 0.9662,
+        "rescued": 17,
+        "harmed": 27,
+        "net_correct": -10,
+        "changed": 53
+      },
+      "flip_prob": {
+        "accuracy": 0.9682,
+        "rescued": 0,
+        "harmed": 0,
+        "net_correct": 0,
+        "changed": 0
+      },
+      "flip_logit": {
+        "accuracy": 0.968,
+        "rescued": 0,
+        "harmed": 1,
+        "net_correct": -1,
+        "changed": 1
+      },
+      "shift_prob": {
+        "accuracy": 0.9672,
+        "rescued": 9,
+        "harmed": 14,
+        "net_correct": -5,
+        "changed": 26
+      }
+    }
+  },
+  "caveat": "Reused validation split; fixed screen is not proof of improved hidden-test accuracy.",
+  "selected_mode": "shift_prob",
+  "candidate_file": "Abhinav/submissions/Dhanush_Run-G-TTA/submission.csv",
+  "baseline_mismatches": 0,
+  "test_changed": 31,
+  "kaggle_public_score": 0.904,
+  "score_evidence": "User-provided Kaggle screenshot; public score, not private accuracy."
+}

@@ -33,3 +33,7 @@ python -m src.train --out runs/r2_final_S --model preact_v --epochs 300 --ema 0.
 ```
 python -m src.predict --ckpt submissions/Abhinav_Run-G/model.pt --out submission.csv --tta flip   # add --balance for class-balanced decoding
 ```
+
+## Dhanush translation-TTA follow-up
+
+The same weights with 10-view translation/flip probability TTA, without balancing, scored **0.90400**. See [Dhanush_Run-G-TTA](../Dhanush_Run-G-TTA/) for reproduction instructions, validation report and predictions. The original flip-only result above remains 0.90100.
